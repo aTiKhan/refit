@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -16,7 +17,7 @@ namespace Refit
 {
     class RequestBuilderImplementation<TApi> : RequestBuilderImplementation, IRequestBuilder<TApi>
     {
-        public RequestBuilderImplementation(RefitSettings refitSettings = null) : base(typeof(TApi), refitSettings)
+        public RequestBuilderImplementation(RefitSettings? refitSettings = null) : base(typeof(TApi), refitSettings)
         {
         }
     }
@@ -30,11 +31,11 @@ namespace Refit
         };
         readonly Dictionary<string, List<RestMethodInfo>> interfaceHttpMethods;
         readonly ConcurrentDictionary<CloseGenericMethodKey, RestMethodInfo> interfaceGenericHttpMethods;
-        readonly IContentSerializer serializer;
+        readonly IHttpContentSerializer serializer;
         readonly RefitSettings settings;
         public Type TargetType { get; }
 
-        public RequestBuilderImplementation(Type refitInterfaceType, RefitSettings refitSettings = null)
+        public RequestBuilderImplementation(Type refitInterfaceType, RefitSettings? refitSettings = null)
         {
             var targetInterfaceInheritedInterfaces = refitInterfaceType.GetInterfaces();
 
@@ -62,7 +63,12 @@ namespace Refit
 
         void AddInterfaceHttpMethods(Type interfaceType, Dictionary<string, List<RestMethodInfo>> methods)
         {
-            foreach (var methodInfo in interfaceType.GetMethods())
+            // Consider public (the implicit visibility) and non-public abstract members of the interfaceType
+            var methodInfos = interfaceType
+                .GetMethods(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                .Where(i => i.IsAbstract);
+
+            foreach (var methodInfo in methodInfos)
             {
                 var attrs = methodInfo.GetCustomAttributes(true);
                 var hasHttpMethod = attrs.OfType<HttpMethodAttribute>().Any();
@@ -79,7 +85,7 @@ namespace Refit
             }
         }
 
-        RestMethodInfo FindMatchingRestMethodInfo(string key, Type[] parameterTypes, Type[] genericArgumentTypes)
+        RestMethodInfo FindMatchingRestMethodInfo(string key, Type[]? parameterTypes, Type[]? genericArgumentTypes)
         {
             if (interfaceHttpMethods.TryGetValue(key, out var httpMethods))
             {
@@ -94,11 +100,11 @@ namespace Refit
 
                 var isGeneric = genericArgumentTypes?.Length > 0;
 
-                var possibleMethodsList = httpMethods.Where(method => method.MethodInfo.GetParameters().Length == parameterTypes.Count());
+                var possibleMethodsList = httpMethods.Where(method => method.MethodInfo.GetParameters().Length == parameterTypes.Length);
 
                 // If it's a generic method, add that filter
                 if (isGeneric)
-                    possibleMethodsList = possibleMethodsList.Where(method => method.MethodInfo.IsGenericMethod && method.MethodInfo.GetGenericArguments().Length == genericArgumentTypes.Length);
+                    possibleMethodsList = possibleMethodsList.Where(method => method.MethodInfo.IsGenericMethod && method.MethodInfo.GetGenericArguments().Length == genericArgumentTypes!.Length);
                 else // exclude generic methods
                     possibleMethodsList = possibleMethodsList.Where(method => !method.MethodInfo.IsGenericMethod);
 
@@ -128,7 +134,7 @@ namespace Refit
 
         }
 
-        RestMethodInfo CloseGenericMethodIfNeeded(RestMethodInfo restMethodInfo, Type[] genericArgumentTypes)
+        RestMethodInfo CloseGenericMethodIfNeeded(RestMethodInfo restMethodInfo, Type[]? genericArgumentTypes)
         {
             if (genericArgumentTypes != null)
             {
@@ -138,7 +144,7 @@ namespace Refit
             return restMethodInfo;
         }
 
-        public Func<HttpClient, object[], object> BuildRestResultFuncForMethod(string methodName, Type[] parameterTypes = null, Type[] genericArgumentTypes = null)
+        public Func<HttpClient, object[], object?> BuildRestResultFuncForMethod(string methodName, Type[]? parameterTypes = null, Type[]? genericArgumentTypes = null)
         {
             if (!interfaceHttpMethods.ContainsKey(methodName))
             {
@@ -155,22 +161,22 @@ namespace Refit
             {
                 // NB: This jacked up reflection code is here because it's
                 // difficult to upcast Task<object> to an arbitrary T, especially
-                // if you need to AOT everything, so we need to reflectively 
+                // if you need to AOT everything, so we need to reflectively
                 // invoke buildTaskFuncForMethod.
                 var taskFuncMi = typeof(RequestBuilderImplementation).GetMethod(nameof(BuildTaskFuncForMethod), BindingFlags.NonPublic | BindingFlags.Instance);
-                var taskFunc = (MulticastDelegate)(taskFuncMi.MakeGenericMethod(restMethod.ReturnResultType, restMethod.DeserializedResultType)).Invoke(this, new[] { restMethod });
+                var taskFunc = (MulticastDelegate?)(taskFuncMi!.MakeGenericMethod(restMethod.ReturnResultType, restMethod.DeserializedResultType)).Invoke(this, new[] { restMethod });
 
-                return (client, args) => taskFunc.DynamicInvoke(client, args);
+                return (client, args) => taskFunc!.DynamicInvoke(client, args);
             }
 
             // Same deal
             var rxFuncMi = typeof(RequestBuilderImplementation).GetMethod(nameof(BuildRxFuncForMethod), BindingFlags.NonPublic | BindingFlags.Instance);
-            var rxFunc = (MulticastDelegate)(rxFuncMi.MakeGenericMethod(restMethod.ReturnResultType, restMethod.DeserializedResultType)).Invoke(this, new[] { restMethod });
+            var rxFunc = (MulticastDelegate?)(rxFuncMi!.MakeGenericMethod(restMethod.ReturnResultType, restMethod.DeserializedResultType)).Invoke(this, new[] { restMethod });
 
-            return (client, args) => rxFunc.DynamicInvoke(client, args);
+            return (client, args) => rxFunc!.DynamicInvoke(client, args);
         }
 
-        async Task AddMultipartItemAsync(MultipartFormDataContent multiPartContent, string fileName, string parameterName, object itemValue)
+        void AddMultipartItem(MultipartFormDataContent multiPartContent, string fileName, string parameterName, object itemValue)
         {
 
             if (itemValue is HttpContent content)
@@ -181,7 +187,7 @@ namespace Refit
             if (itemValue is MultipartItem multipartItem)
             {
                 var httpContent = multipartItem.ToContent();
-                multiPartContent.Add(httpContent, parameterName, string.IsNullOrEmpty(multipartItem.FileName) ? fileName : multipartItem.FileName);
+                multiPartContent.Add(httpContent, multipartItem.Name ?? parameterName, string.IsNullOrEmpty(multipartItem.FileName) ? fileName : multipartItem.FileName);
                 return;
             }
 
@@ -216,7 +222,7 @@ namespace Refit
             Exception e;
             try
             {
-                multiPartContent.Add(await settings.ContentSerializer.SerializeAsync(itemValue).ConfigureAwait(false), parameterName);
+                multiPartContent.Add(settings.ContentSerializer.ToHttpContent(itemValue), parameterName);
                 return;
             }
             catch (Exception ex)
@@ -228,7 +234,7 @@ namespace Refit
             throw new ArgumentException($"Unexpected parameter type in a Multipart request. Parameter {fileName} is of type {itemValue.GetType().Name}, whereas allowed types are String, Stream, FileInfo, Byte array and anything that's JSON serializable", nameof(itemValue), e);
         }
 
-        Func<HttpClient, CancellationToken, object[], Task<T>> BuildCancellableTaskFuncForMethod<T, TBody>(RestMethodInfo restMethod)
+        Func<HttpClient, CancellationToken, object[], Task<T?>> BuildCancellableTaskFuncForMethod<T, TBody>(RestMethodInfo restMethod)
         {
             return async (client, ct, paramList) =>
             {
@@ -236,34 +242,62 @@ namespace Refit
                     throw new InvalidOperationException("BaseAddress must be set on the HttpClient instance");
 
                 var factory = BuildRequestFactoryForMethod(restMethod, client.BaseAddress.AbsolutePath, restMethod.CancellationToken != null);
-                var rq = await factory(paramList).ConfigureAwait(false);
-                HttpResponseMessage resp = null;
-                HttpContent content = null;
+                var rq = factory(paramList);
+                HttpResponseMessage? resp = null;
+                HttpContent? content = null;
                 var disposeResponse = true;
                 try
                 {
+                    //Load the data into buffer when body should be buffered.
+                    if (restMethod.BodyParameterInfo?.Item2 ?? false && (rq.Content != null))
+                    {
+                        await rq.Content!.LoadIntoBufferAsync().ConfigureAwait(false);
+                    }
                     resp = await client.SendAsync(rq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
                     content = resp.Content ?? new StringContent(string.Empty);
-                    ApiException e = null;
+                    Exception? e = null;
                     disposeResponse = restMethod.ShouldDisposeResponse;
 
-                    if (!resp.IsSuccessStatusCode && typeof(T) != typeof(HttpResponseMessage))
+                    if (typeof(T) != typeof(HttpResponseMessage))
                     {
-                        disposeResponse = false; // caller has to dispose
-                        e = await ApiException.Create(rq, restMethod.HttpMethod, resp, restMethod.RefitSettings).ConfigureAwait(false);
+                        e = await settings.ExceptionFactory(resp).ConfigureAwait(false);
                     }
 
                     if (restMethod.IsApiResponse)
                     {
-                        var body = await DeserializeContentAsync<TBody>(resp, content);
-                        return ApiResponse.Create<T, TBody>(resp, body, e);
+                        var body = default(TBody);
+
+                        try
+                        {
+                            // Only attempt to deserialize content if no error present for backward-compatibility
+                            body = e == null
+                                ? await DeserializeContentAsync<TBody>(resp, content, ct).ConfigureAwait(false)
+                                : default;
+                        }
+                        catch (Exception ex)
+                        {
+                            //if an error occured while attempting to deserialize return the wrapped ApiException
+                            e = await ApiException.Create("An error occured deserializing the response.", resp.RequestMessage!, resp.RequestMessage!.Method, resp, settings, ex);
+                        }
+
+                        return ApiResponse.Create<T, TBody>(resp, body, settings, e as ApiException);
                     }
                     else if (e != null)
                     {
+                        disposeResponse = false; // caller has to dispose
                         throw e;
                     }
                     else
-                        return await DeserializeContentAsync<T>(resp, content);
+                    {
+                        try
+                        {
+                            return await DeserializeContentAsync<T>(resp, content, ct).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            throw await ApiException.Create("An error occured deserializing the response.", resp.RequestMessage!, resp.RequestMessage!.Method, resp, settings, ex);
+                        }
+                    }
                 }
                 finally
                 {
@@ -279,9 +313,9 @@ namespace Refit
             };
         }
 
-        private async Task<T> DeserializeContentAsync<T>(HttpResponseMessage resp, HttpContent content)
+        async Task<T?> DeserializeContentAsync<T>(HttpResponseMessage resp, HttpContent content, CancellationToken cancellationToken)
         {
-            T result;
+            T? result;
             if (typeof(T) == typeof(HttpResponseMessage))
             {
                 // NB: This double-casting manual-boxing hate crime is the only way to make
@@ -289,44 +323,42 @@ namespace Refit
                 // and would be A Bad Idea if we hadn't already vetted the return type.
                 result = (T)(object)resp;
             }
-            else if (!resp.IsSuccessStatusCode)
-            {
-                result = default;
-            }
             else if (typeof(T) == typeof(HttpContent))
             {
                 result = (T)(object)content;
             }
             else if (typeof(T) == typeof(Stream))
             {
-                var stream = (object)await content.ReadAsStreamAsync().ConfigureAwait(false);
+                var stream = (object)await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
                 result = (T)stream;
             }
             else if (typeof(T) == typeof(string))
             {
-                using var stream = await content.ReadAsStreamAsync().ConfigureAwait(false);
+                using var stream = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
                 using var reader = new StreamReader(stream);
                 var str = (object)await reader.ReadToEndAsync().ConfigureAwait(false);
                 result = (T)str;
             }
             else
             {
-                result = await serializer.DeserializeAsync<T>(content);
+                result = await serializer.FromHttpContentAsync<T>(content, cancellationToken).ConfigureAwait(false);
             }
             return result;
         }
 
-        List<KeyValuePair<string, object>> BuildQueryMap(object @object, string delimiter = null, RestMethodParameterInfo parameterInfo = null)
+        List<KeyValuePair<string, object?>> BuildQueryMap(object? @object, string? delimiter = null, RestMethodParameterInfo? parameterInfo = null)
         {
             if (@object is IDictionary idictionary)
             {
                 return BuildQueryMap(idictionary, delimiter);
             }
 
-            var kvps = new List<KeyValuePair<string, object>>();
+            var kvps = new List<KeyValuePair<string, object?>>();
+
+            if (@object is null) return kvps;
 
             var props = @object.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public)
-                .Where(p => p.CanRead && p.GetMethod.IsPublic);
+                .Where(p => p.CanRead && p.GetMethod?.IsPublic == true);
 
             foreach (var propertyInfo in props)
             {
@@ -361,11 +393,11 @@ namespace Refit
                 }
 
                 // If obj is IEnumerable - format it accounting for Query attribute and CollectionFormat
-                if (!(obj is string) && obj is IEnumerable ienu)
+                if (!(obj is string) && obj is IEnumerable ienu && !(obj is IDictionary))
                 {
                     foreach (var value in ParseEnumerableQueryParameterValue(ienu, propertyInfo, propertyInfo.PropertyType, queryAttribute))
                     {
-                        kvps.Add(new KeyValuePair<string, object>(key, value));
+                        kvps.Add(new KeyValuePair<string, object?>(key, value));
                     }
 
                     continue;
@@ -373,7 +405,7 @@ namespace Refit
 
                 if (DoNotConvertToQueryMap(obj))
                 {
-                    kvps.Add(new KeyValuePair<string, object>(key, obj));
+                    kvps.Add(new KeyValuePair<string, object?>(key, obj));
                     continue;
                 }
 
@@ -382,7 +414,7 @@ namespace Refit
                     case IDictionary idict:
                         foreach (var keyValuePair in BuildQueryMap(idict, delimiter))
                         {
-                            kvps.Add(new KeyValuePair<string, object>($"{key}{delimiter}{keyValuePair.Key}", keyValuePair.Value));
+                            kvps.Add(new KeyValuePair<string, object?>($"{key}{delimiter}{keyValuePair.Key}", keyValuePair.Value));
                         }
 
                         break;
@@ -390,7 +422,7 @@ namespace Refit
                     default:
                         foreach (var keyValuePair in BuildQueryMap(obj, delimiter))
                         {
-                            kvps.Add(new KeyValuePair<string, object>($"{key}{delimiter}{keyValuePair.Key}", keyValuePair.Value));
+                            kvps.Add(new KeyValuePair<string, object?>($"{key}{delimiter}{keyValuePair.Key}", keyValuePair.Value));
                         }
 
                         break;
@@ -400,26 +432,33 @@ namespace Refit
             return kvps;
         }
 
-        List<KeyValuePair<string, object>> BuildQueryMap(IDictionary dictionary, string delimiter = null)
+        List<KeyValuePair<string, object?>> BuildQueryMap(IDictionary dictionary, string? delimiter = null)
         {
-            var kvps = new List<KeyValuePair<string, object>>();
+            var kvps = new List<KeyValuePair<string, object?>>();
 
-            var props = dictionary.Keys;
-            foreach (string key in props)
+            foreach (var key in dictionary.Keys)
             {
                 var obj = dictionary[key];
                 if (obj == null)
                     continue;
 
+                var keyType = key.GetType();
+                var formattedKey = settings.UrlParameterFormatter.Format(key, keyType, keyType);
+
+                if(string.IsNullOrWhiteSpace(formattedKey)) // blank keys can't be put in the query string
+                {
+                    continue;
+                }
+
                 if (DoNotConvertToQueryMap(obj))
                 {
-                    kvps.Add(new KeyValuePair<string, object>(key, obj));
+                    kvps.Add(new KeyValuePair<string, object?>(formattedKey!, obj));
                 }
                 else
                 {
                     foreach (var keyValuePair in BuildQueryMap(obj, delimiter))
                     {
-                        kvps.Add(new KeyValuePair<string, object>($"{key}{delimiter}{keyValuePair.Key}", keyValuePair.Value));
+                        kvps.Add(new KeyValuePair<string, object?>($"{formattedKey}{delimiter}{keyValuePair.Key}", keyValuePair.Value));
                     }
                 }
             }
@@ -427,12 +466,11 @@ namespace Refit
             return kvps;
         }
 
-        Func<object[], Task<HttpRequestMessage>> BuildRequestFactoryForMethod(RestMethodInfo restMethod, string basePath, bool paramsContainsCancellationToken)
+        Func<object[], HttpRequestMessage> BuildRequestFactoryForMethod(RestMethodInfo restMethod, string basePath, bool paramsContainsCancellationToken)
         {
-
-            return async paramList =>
+            return paramList =>
             {
-                // make sure we strip out any cancelation tokens
+                // make sure we strip out any cancellation tokens
                 if (paramsContainsCancellationToken)
                 {
                     paramList = paramList.Where(o => o == null || o.GetType() != typeof(CancellationToken)).ToArray();
@@ -444,7 +482,7 @@ namespace Refit
                 };
 
                 // set up multipart content
-                MultipartFormDataContent multiPartContent = null;
+                MultipartFormDataContent? multiPartContent = null;
                 if (restMethod.IsMultipart)
                 {
                     multiPartContent = new MultipartFormDataContent(restMethod.MultipartBoundary);
@@ -452,12 +490,15 @@ namespace Refit
                 }
 
                 var urlTarget = (basePath == "/" ? string.Empty : basePath) + restMethod.RelativePath;
-                var queryParamsToAdd = new List<KeyValuePair<string, string>>();
-                var headersToAdd = new Dictionary<string, string>(restMethod.Headers);
-                RestMethodParameterInfo parameterInfo = null;
+                var queryParamsToAdd = new List<KeyValuePair<string, string?>>();
+                var headersToAdd = new Dictionary<string, string?>(restMethod.Headers);
+                var propertiesToAdd = new Dictionary<string, object?>();
+
+                RestMethodParameterInfo? parameterInfo = null;
 
                 for (var i = 0; i < paramList.Length; i++)
                 {
+                    var isParameterMappedToRequest = false;
                     var param = paramList[i];
                     // if part of REST resource URL, substitute it in
                     if (restMethod.ParameterMap.ContainsKey(i))
@@ -485,7 +526,7 @@ namespace Refit
                             if (restMethod.ParameterMap[i].Type == ParameterType.RoundTripping)
                             {
                                 pattern = $@"{{\*\*{restMethod.ParameterMap[i].Name}}}";
-                                var paramValue = param as string;
+                                var paramValue = (string)param;
                                 replacement = string.Join(
                                     "/",
                                     paramValue.Split('/')
@@ -509,7 +550,7 @@ namespace Refit
                                 replacement,
                                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-                            continue;
+                            isParameterMappedToRequest = true;
 
                         }
                     }
@@ -543,7 +584,7 @@ namespace Refit
                                 case BodySerializationMethod.Json:
 #pragma warning restore CS0618 // Type or member is obsolete
                                 case BodySerializationMethod.Serialized:
-                                    var content = await serializer.SerializeAsync(param).ConfigureAwait(false);
+                                    var content = serializer.ToHttpContent(param);
                                     switch (restMethod.BodyParameterInfo.Item2)
                                     {
                                         case false:
@@ -567,18 +608,45 @@ namespace Refit
                             }
                         }
 
-                        continue;
+                        isParameterMappedToRequest = true;
                     }
 
                     // if header, add to request headers
                     if (restMethod.HeaderParameterMap.ContainsKey(i))
                     {
                         headersToAdd[restMethod.HeaderParameterMap[i]] = param?.ToString();
-                        continue;
+                        isParameterMappedToRequest = true;
                     }
 
-                    // ignore nulls
-                    if (param == null) continue;
+                    //if header collection, add to request headers
+                    if (restMethod.HeaderCollectionParameterMap.Contains(i))
+                    {
+                        var headerCollection = param as IDictionary<string, string> ?? new Dictionary<string, string>();
+
+                        foreach (var header in headerCollection)
+                        {
+                            headersToAdd[header.Key] = header.Value;
+                        }
+
+                        isParameterMappedToRequest = true;
+                    }
+
+                    //if authorize, add to request headers with scheme
+                    if (restMethod.AuthorizeParameterInfo != null && restMethod.AuthorizeParameterInfo.Item2 == i)
+                    {
+                        headersToAdd["Authorization"] = $"{restMethod.AuthorizeParameterInfo.Item1} {param}";
+                        isParameterMappedToRequest = true;
+                    }
+
+                    //if property, add to populate into HttpRequestMessage.Properties
+                    if (restMethod.PropertyParameterMap.ContainsKey(i))
+                    {
+                        propertiesToAdd[restMethod.PropertyParameterMap[i]] = param;
+                        isParameterMappedToRequest = true;
+                    }
+
+                    // ignore nulls and already processed parameters
+                    if (isParameterMappedToRequest || param == null) continue;
 
                     // for anything that fell through to here, if this is not a multipart method add the parameter to the query string
                     // or if is an object bound to the path add any non-path bound properties to query string
@@ -629,14 +697,14 @@ namespace Refit
 
                     if (typeIsCollection)
                     {
-                        foreach (var item in enumerable)
+                        foreach (var item in enumerable!)
                         {
-                            await AddMultipartItemAsync(multiPartContent, itemName, parameterName, item).ConfigureAwait(false);
+                            AddMultipartItem(multiPartContent!, itemName, parameterName, item);
                         }
                     }
                     else
                     {
-                        await AddMultipartItemAsync(multiPartContent, itemName, parameterName, itemValue).ConfigureAwait(false);
+                        AddMultipartItem(multiPartContent!, itemName, parameterName, itemValue);
                     }
                 }
 
@@ -648,7 +716,7 @@ namespace Refit
                     // sure we have an HttpContent object to add them to,
                     // provided the HttpClient will allow it for the method
                     if (ret.Content == null && !BodylessMethods.Contains(ret.Method))
-                        ret.Content = new ByteArrayContent(new byte[0]);
+                        ret.Content = new ByteArrayContent(Array.Empty<byte>());
 
                     foreach (var header in headersToAdd)
                     {
@@ -656,20 +724,41 @@ namespace Refit
                     }
                 }
 
-                // NB: The URI methods in .NET are dumb. Also, we do this 
-                // UriBuilder business so that we preserve any hardcoded query 
+                foreach (var property in propertiesToAdd)
+                {
+#if NET5_0_OR_GREATER
+                    ret.Options.Set(new HttpRequestOptionsKey<object?>(property.Key), property.Value);
+#else
+                    ret.Properties[property.Key] = property.Value;
+#endif
+                }
+
+                // Always add the top-level type of the interface to the properties
+#if NET5_0_OR_GREATER
+                ret.Options.Set(new HttpRequestOptionsKey<Type>(HttpRequestMessageOptions.InterfaceType), TargetType);
+#else
+                ret.Properties[HttpRequestMessageOptions.InterfaceType] = TargetType;
+#endif
+
+                ;
+
+                // NB: The URI methods in .NET are dumb. Also, we do this
+                // UriBuilder business so that we preserve any hardcoded query
                 // parameters as well as add the parameterized ones.
                 var uri = new UriBuilder(new Uri(new Uri("http://api"), urlTarget));
                 var query = HttpUtility.ParseQueryString(uri.Query ?? "");
                 foreach (var key in query.AllKeys)
                 {
-                    queryParamsToAdd.Insert(0, new KeyValuePair<string, string>(key, query[key]));
+                    if (!string.IsNullOrWhiteSpace(key))
+                    {
+                        queryParamsToAdd.Insert(0, new KeyValuePair<string, string?>(key, query[key]));
+                    }
                 }
 
                 if (queryParamsToAdd.Any())
                 {
                     var pairs = queryParamsToAdd.Where(x => x.Key != null && x.Value != null)
-                                                .Select(x => Uri.EscapeDataString(x.Key) + "=" + Uri.EscapeDataString(x.Value));
+                                                .Select(x => Uri.EscapeDataString(x.Key) + "=" + Uri.EscapeDataString(x.Value ?? string.Empty));
                     uri.Query = string.Join("&", pairs);
                 }
                 else
@@ -683,22 +772,22 @@ namespace Refit
             };
         }
 
-        IEnumerable<KeyValuePair<string, string>> ParseQueryParameter(object param, ParameterInfo parameterInfo, string queryPath, QueryAttribute queryAttribute)
+        IEnumerable<KeyValuePair<string, string?>> ParseQueryParameter(object? param, ParameterInfo parameterInfo, string queryPath, QueryAttribute queryAttribute)
         {
             if (!(param is string) && param is IEnumerable paramValues)
             {
                 foreach (var value in ParseEnumerableQueryParameterValue(paramValues, parameterInfo, parameterInfo.ParameterType, queryAttribute))
                 {
-                    yield return new KeyValuePair<string, string>(queryPath, value);
+                    yield return new KeyValuePair<string, string?>(queryPath, value);
                 }
             }
             else
             {
-                yield return new KeyValuePair<string, string>(queryPath, settings.UrlParameterFormatter.Format(param, parameterInfo, parameterInfo.ParameterType));
+                yield return new KeyValuePair<string, string?>(queryPath, settings.UrlParameterFormatter.Format(param, parameterInfo, parameterInfo.ParameterType));
             }
         }
 
-        IEnumerable<string> ParseEnumerableQueryParameterValue(IEnumerable paramValues, ICustomAttributeProvider customAttributeProvider, Type type, QueryAttribute queryAttribute)
+        IEnumerable<string?> ParseEnumerableQueryParameterValue(IEnumerable paramValues, ICustomAttributeProvider customAttributeProvider, Type type, QueryAttribute? queryAttribute)
         {
             var collectionFormat = queryAttribute != null && queryAttribute.IsCollectionFormatSpecified
                 ? queryAttribute.CollectionFormat
@@ -731,7 +820,7 @@ namespace Refit
             }
         }
 
-        Func<HttpClient, object[], IObservable<T>> BuildRxFuncForMethod<T, TBody>(RestMethodInfo restMethod)
+        Func<HttpClient, object[], IObservable<T?>> BuildRxFuncForMethod<T, TBody>(RestMethodInfo restMethod)
         {
             var taskFunc = BuildCancellableTaskFuncForMethod<T, TBody>(restMethod);
 
@@ -753,7 +842,7 @@ namespace Refit
             };
         }
 
-        Func<HttpClient, object[], Task<T>> BuildTaskFuncForMethod<T, TBody>(RestMethodInfo restMethod)
+        Func<HttpClient, object[], Task<T?>> BuildTaskFuncForMethod<T, TBody>(RestMethodInfo restMethod)
         {
             var ret = BuildCancellableTaskFuncForMethod<T, TBody>(restMethod);
 
@@ -776,7 +865,7 @@ namespace Refit
                     throw new InvalidOperationException("BaseAddress must be set on the HttpClient instance");
 
                 var factory = BuildRequestFactoryForMethod(restMethod, client.BaseAddress.AbsolutePath, restMethod.CancellationToken != null);
-                var rq = await factory(paramList).ConfigureAwait(false);
+                var rq = factory(paramList);
 
                 var ct = CancellationToken.None;
 
@@ -786,14 +875,16 @@ namespace Refit
                 }
 
                 using var resp = await client.SendAsync(rq, ct).ConfigureAwait(false);
-                if (!resp.IsSuccessStatusCode)
+
+                var exception = await settings.ExceptionFactory(resp).ConfigureAwait(false);
+                if (exception != null)
                 {
-                    throw await ApiException.Create(rq, restMethod.HttpMethod, resp, settings).ConfigureAwait(false);
+                    throw exception;
                 }
             };
         }
 
-        static bool DoNotConvertToQueryMap(object value)
+        static bool DoNotConvertToQueryMap(object? value)
         {
             if (value == null)
                 return false;
@@ -829,14 +920,14 @@ namespace Refit
             return ShouldReturn();
         }
 
-        static void SetHeader(HttpRequestMessage request, string name, string value)
+        static void SetHeader(HttpRequestMessage request, string name, string? value)
         {
             // Clear any existing version of this header that might be set, because
-            // we want to allow removal/redefinition of headers. 
+            // we want to allow removal/redefinition of headers.
             // We also don't want to double up content headers which may have been
             // set for us automatically.
 
-            // NB: We have to enumerate the header names to check existence because 
+            // NB: We have to enumerate the header names to check existence because
             // Contains throws if it's the wrong header type for the collection.
             if (request.Headers.Any(x => x.Key == name))
             {

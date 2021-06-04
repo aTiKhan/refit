@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Reactive.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 using Newtonsoft.Json;
@@ -26,6 +27,11 @@ namespace Refit.Tests
         public string name { get; set; }
     }
 #pragma warning restore IDE1006 // Naming Styles
+
+    public class BigObject
+    {
+        public byte[] BigData { get; set; }
+    }
 
     [Headers("User-Agent: Refit Integration Tests")]
     public interface INpmJs
@@ -50,7 +56,15 @@ namespace Refit.Tests
 
         [Post("/1h3a5jm1")]
         Task PostGeneric<T>(T param);
+
+        [Post("/big")]
+        Task PostBig(BigObject big);
+
+
+        [Get("/foo/{arguments}")]
+        Task SomeApiThatUsesVariableNameFromCodeGen(string arguments);
     }
+
     public interface IApiBindPathToObject
     {
         [Get("/foos/{request.someProperty}/bar/{request.someProperty2}")]
@@ -78,7 +92,7 @@ namespace Refit.Tests
         Task GetFoos(PathBoundList request);
 
         [Get("/foos2/{values}")]
-        Task GetFoos2(List<int> Values);
+        Task GetFoos2(List<int> values);
 
         [Post("/foos/{request.someProperty}/bar/{request.someProperty2}")]
         Task PostFooBar(PathBoundObject request, [Body]object someObject);
@@ -157,7 +171,7 @@ namespace Refit.Tests
         [Get("")]
         Task Get();
 
-#if NETCOREAPP3_1
+#if NETCOREAPP3_1_OR_GREATER
         public static IRefitInterfaceWithStaticMethod Create()
         {
             // This is a C# 8 factory method
@@ -263,7 +277,7 @@ namespace Refit.Tests
 
     public class RestServiceIntegrationTests
     {
-#if NETCOREAPP3_1
+#if NETCOREAPP3_1_OR_GREATER
         [Fact]
         public void CanCreateInstanceUsingStaticMethod()
         {
@@ -991,6 +1005,73 @@ namespace Refit.Tests
         }
 
         [Fact]
+        public async Task HitTheGitHubOrgMembersApiInParallel()
+        {
+            var mockHttp = new MockHttpMessageHandler();
+
+            var settings = new RefitSettings
+            {
+                HttpMessageHandlerFactory = () => mockHttp,
+                ContentSerializer = new NewtonsoftJsonContentSerializer(new JsonSerializerSettings() { ContractResolver = new SnakeCasePropertyNamesContractResolver() })
+            };
+
+            mockHttp.Expect(HttpMethod.Get, "https://api.github.com/orgs/github/members")
+                  .Respond("application/json", "[{ 'login':'octocat', 'avatar_url':'http://foo/bar', 'type':'User'}]");
+            mockHttp.Expect(HttpMethod.Get, "https://api.github.com/orgs/github/members")
+                  .Respond("application/json", "[{ 'login':'octocat', 'avatar_url':'http://foo/bar', 'type':'User'}]");
+
+
+            var fixture = RestService.For<IGitHubApi>("https://api.github.com", settings);
+
+            var task1 = fixture.GetOrgMembers("github");
+            var task2 = fixture.GetOrgMembers("github");
+
+            await Task.WhenAll(task1, task2);
+
+            Assert.True(task1.Result.Count > 0);
+            Assert.Contains(task1.Result, member => member.Type == "User");
+
+            Assert.True(task2.Result.Count > 0);
+            Assert.Contains(task2.Result, member => member.Type == "User");
+
+            mockHttp.VerifyNoOutstandingExpectation();
+        }
+
+        [Fact]
+        public async Task RequestCanceledBeforeResponseRead()
+        {
+            var mockHttp = new MockHttpMessageHandler();
+
+            var settings = new RefitSettings
+            {
+                HttpMessageHandlerFactory = () => mockHttp,
+                ContentSerializer = new NewtonsoftJsonContentSerializer(new JsonSerializerSettings() { ContractResolver = new SnakeCasePropertyNamesContractResolver() })
+            };
+
+            var cts = new CancellationTokenSource();
+
+            mockHttp.When(HttpMethod.Get, "https://api.github.com/orgs/github/members")
+                    .Respond(req =>
+                    {
+                        // Cancel the request
+                        cts.Cancel();
+
+                        return new HttpResponseMessage(HttpStatusCode.OK)
+                        {
+                            Content = new StringContent("[{ 'login':'octocat', 'avatar_url':'http://foo/bar', 'type':'User'}]", Encoding.UTF8, "application/json")
+                        };
+                    });
+            
+
+            var fixture = RestService.For<IGitHubApi>("https://api.github.com", settings);
+
+            
+
+            await Assert.ThrowsAsync<TaskCanceledException>(async () => await fixture.GetOrgMembers("github", cts.Token));            
+        }
+
+
+        [Fact]
         public async Task HitTheGitHubUserSearchApi()
         {
             var mockHttp = new MockHttpMessageHandler();
@@ -1151,7 +1232,7 @@ namespace Refit.Tests
             };
 
             mockHttp.Expect(HttpMethod.Get, "https://registry.npmjs.org/congruence")
-                    .Respond("application/json", "{ '_id':'congruence', '_rev':'rev' , 'name':'name'}");
+                    .Respond("application/json", "{ \"_id\":\"congruence\", \"_rev\":\"rev\" , \"name\":\"name\"}");
 
 
 
@@ -1283,6 +1364,26 @@ namespace Refit.Tests
         }
 
         [Fact]
+        public async Task UseMethodWithArgumentsParameter()
+        {
+            var mockHttp = new MockHttpMessageHandler();
+
+            var settings = new RefitSettings
+            {
+                HttpMessageHandlerFactory = () => mockHttp
+            };
+
+            var fixture = RestService.For<IRequestBin>("http://httpbin.org/", settings);
+
+            mockHttp.Expect(HttpMethod.Get, "http://httpbin.org/foo/something")
+                    .Respond(HttpStatusCode.OK);
+
+            await fixture.SomeApiThatUsesVariableNameFromCodeGen("something");
+
+            mockHttp.VerifyNoOutstandingExpectation();
+        }
+
+        [Fact]
         public async Task CanGetDataOutOfErrorResponses()
         {
             var mockHttp = new MockHttpMessageHandler();
@@ -1312,6 +1413,42 @@ namespace Refit.Tests
             }
         }
 
+        [Fact]
+        public async Task CanSerializeBigData()
+        {
+            var mockHttp = new MockHttpMessageHandler();
+
+            var settings = new RefitSettings
+            {
+                HttpMessageHandlerFactory = () => mockHttp,
+                ContentSerializer = new SystemTextJsonContentSerializer()
+            };
+
+            var bigObject = new BigObject
+            {
+                BigData = Enumerable.Range(0, 800000).Select(x => (byte)(x % 256)).ToArray()
+            };
+
+            mockHttp.Expect(HttpMethod.Post, "http://httpbin.org/big")
+                    .With(m =>
+                    {
+                        async Task<bool> T()
+                        {
+                            using var s = await m.Content.ReadAsStreamAsync();
+                            var it = await System.Text.Json.JsonSerializer.DeserializeAsync<BigObject>(s, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+                            return it.BigData.SequenceEqual(bigObject.BigData);
+                        }
+
+                        return T().Result;
+                    })
+                    .Respond(HttpStatusCode.OK);
+
+            var fixture = RestService.For<IRequestBin>("http://httpbin.org/", settings);
+
+            await fixture.PostBig(bigObject);
+
+            mockHttp.VerifyNoOutstandingExpectation();
+        }
 
         [Fact]
         public async Task ErrorsFromApiReturnErrorContent()
@@ -1374,37 +1511,6 @@ namespace Refit.Tests
         }
 
         [Fact]
-        public async Task ErrorsFromApiReturnErrorContentNonAsync()
-        {
-            var mockHttp = new MockHttpMessageHandler();
-
-            var settings = new RefitSettings
-            {
-                HttpMessageHandlerFactory = () => mockHttp,
-                ContentSerializer = new NewtonsoftJsonContentSerializer(new JsonSerializerSettings() { ContractResolver = new SnakeCasePropertyNamesContractResolver() })
-            };
-
-            mockHttp.Expect(HttpMethod.Post, "https://api.github.com/users")
-                    .Respond(HttpStatusCode.BadRequest, "application/json", "{ 'errors': [ 'error1', 'message' ]}");
-
-
-            var fixture = RestService.For<IGitHubApi>("https://api.github.com", settings);
-
-
-            var result = await Assert.ThrowsAsync<ApiException>(async () => await fixture.CreateUser(new User { Name = "foo" }));
-
-
-#pragma warning disable CS0618 // Ensure that this code continues to be tested until it is removed
-            var errors = result.GetContentAs<ErrorResponse>();
-#pragma warning restore CS0618
-
-            Assert.Contains("error1", errors.Errors);
-            Assert.Contains("message", errors.Errors);
-
-            mockHttp.VerifyNoOutstandingExpectation();
-        }
-
-        [Fact]
         public void NonRefitInterfacesThrowMeaningfulExceptions()
         {
             try
@@ -1444,7 +1550,7 @@ namespace Refit.Tests
             mockHttp.Expect(HttpMethod.Get, "http://httpbin.org/get")
                     .WithHeaders("X-Refit", "99")
                     .WithQueryString("param", "foo")
-                    .Respond("application/json", "{'url': 'http://httpbin.org/get?param=foo', 'args': {'param': 'foo'}, 'headers':{'X-Refit':'99'}}");
+                    .Respond("application/json", "{\"url\": \"http://httpbin.org/get?param=foo\", \"args\": {\"param\": \"foo\"}, \"headers\":{\"X-Refit\":\"99\"}}");
 
 
 
@@ -1494,7 +1600,7 @@ namespace Refit.Tests
 
             mockHttp.Expect(HttpMethod.Get, "https://httpbin.org/get")
                 .WithHeaders("X-Refit", "99")
-                .Respond("application/json", "{'url': 'https://httpbin.org/get?FirstName=John&LastName=Rambo', 'args': {'FirstName': 'John', 'lName': 'Rambo'}}");
+                .Respond("application/json", "{\"url\": \"https://httpbin.org/get?FirstName=John&LastName=Rambo\", \"args\": {\"FirstName\": \"John\", \"lName\": \"Rambo\"}}");
 
             var myParams = new MySimpleQueryParams
             {
@@ -1521,7 +1627,7 @@ namespace Refit.Tests
             };
 
             mockHttp.Expect(HttpMethod.Get, "https://httpbin.org/get")
-                .Respond("application/json", "{'url': 'https://httpbin.org/get?hardcoded=true&FirstName=John&LastName=Rambo&Addr_Zip=9999&Addr_Street=HomeStreet 99&MetaData_Age=99&MetaData_Initials=JR&MetaData_Birthday=10%2F31%2F1918 4%3A21%3A16 PM&Other=12345&Other=10%2F31%2F2017 4%3A21%3A17 PM&Other=696e8653-6671-4484-a65f-9485af95fd3a', 'args': { 'Addr_Street': 'HomeStreet 99', 'Addr_Zip': '9999', 'FirstName': 'John', 'LastName': 'Rambo', 'MetaData_Age': '99', 'MetaData_Birthday': '10/31/1981 4:32:59 PM', 'MetaData_Initials': 'JR', 'Other': ['12345','10/31/2017 4:32:59 PM','60282dd2-f79a-4400-be01-bcb0e86e7bc6'], 'hardcoded': 'true'}}");
+                .Respond("application/json", "{\"url\": \"https://httpbin.org/get?hardcoded=true&FirstName=John&LastName=Rambo&Addr_Zip=9999&Addr_Street=HomeStreet 99&MetaData_Age=99&MetaData_Initials=JR&MetaData_Birthday=10%2F31%2F1918 4%3A21%3A16 PM&Other=12345&Other=10%2F31%2F2017 4%3A21%3A17 PM&Other=696e8653-6671-4484-a65f-9485af95fd3a\", \"args\": { \"Addr_Street\": \"HomeStreet 99\", \"Addr_Zip\": \"9999\", \"FirstName\": \"John\", \"LastName\": \"Rambo\", \"MetaData_Age\": \"99\", \"MetaData_Birthday\": \"10/31/1981 4:32:59 PM\", \"MetaData_Initials\": \"JR\", \"Other\": [\"12345\",\"10/31/2017 4:32:59 PM\",\"60282dd2-f79a-4400-be01-bcb0e86e7bc6\"], \"hardcoded\": \"true\"}}");
 
             var myParams = new MyComplexQueryParams
             {
@@ -1560,7 +1666,7 @@ namespace Refit.Tests
             };
 
             mockHttp.Expect(HttpMethod.Post, "https://httpbin.org/post")
-                .Respond("application/json", "{'url': 'https://httpbin.org/post?hardcoded=true&FirstName=John&LastName=Rambo&Addr_Zip=9999&Addr_Street=HomeStreet 99&MetaData_Age=99&MetaData_Initials=JR&MetaData_Birthday=10%2F31%2F1918 4%3A21%3A16 PM&Other=12345&Other=10%2F31%2F2017 4%3A21%3A17 PM&Other=696e8653-6671-4484-a65f-9485af95fd3a', 'args': { 'Addr_Street': 'HomeStreet 99', 'Addr_Zip': '9999', 'FirstName': 'John', 'LastName': 'Rambo', 'MetaData_Age': '99', 'MetaData_Birthday': '10/31/1981 4:32:59 PM', 'MetaData_Initials': 'JR', 'Other': ['12345','10/31/2017 4:32:59 PM','60282dd2-f79a-4400-be01-bcb0e86e7bc6'], 'hardcoded': 'true'}}");
+                .Respond("application/json", "{\"url\": \"https://httpbin.org/post?hardcoded=true&FirstName=John&LastName=Rambo&Addr_Zip=9999&Addr_Street=HomeStreet 99&MetaData_Age=99&MetaData_Initials=JR&MetaData_Birthday=10%2F31%2F1918 4%3A21%3A16 PM&Other=12345&Other=10%2F31%2F2017 4%3A21%3A17 PM&Other=696e8653-6671-4484-a65f-9485af95fd3a\", \"args\": { \"Addr_Street\": \"HomeStreet 99\", \"Addr_Zip\": \"9999\", \"FirstName\": \"John\", \"LastName\": \"Rambo\", \"MetaData_Age\": \"99\", \"MetaData_Birthday\": \"10/31/1981 4:32:59 PM\", \"MetaData_Initials\": \"JR\", \"Other\": [\"12345\",\"10/31/2017 4:32:59 PM\",\"60282dd2-f79a-4400-be01-bcb0e86e7bc6\"], \"hardcoded\": \"true\"}}");
 
             var myParams = new MyComplexQueryParams
             {
@@ -1671,6 +1777,69 @@ namespace Refit.Tests
             mockHttp.VerifyNoOutstandingExpectation();
         }
 
+
+        [Fact]
+        public async Task InheritedInterfaceWithOnlyBaseMethodsTest()
+        {
+            var mockHttp = new MockHttpMessageHandler();
+
+            var settings = new RefitSettings
+            {
+                HttpMessageHandlerFactory = () => mockHttp
+            };
+
+            var fixture = RestService.For<IContainAandB>("https://httpbin.org", settings);
+
+            mockHttp.Expect(HttpMethod.Get, "https://httpbin.org/get").Respond("application/json", nameof(IAmInterfaceA.Ping));
+            var resp = await fixture.Ping();
+            Assert.Equal(nameof(IAmInterfaceA.Ping), resp);
+            mockHttp.VerifyNoOutstandingExpectation();
+
+            mockHttp.Expect(HttpMethod.Get, "https://httpbin.org/get")
+                .Respond("application/json", nameof(IAmInterfaceB.Pong));
+            resp = await fixture.Pong();
+            Assert.Equal(nameof(IAmInterfaceB.Pong), resp);
+            mockHttp.VerifyNoOutstandingExpectation();
+        }
+
+
+        [Fact]
+        public async Task InheritedInterfaceWithoutRefitInBaseMethodsTest()
+        {
+            var mockHttp = new MockHttpMessageHandler();
+
+            var settings = new RefitSettings
+            {
+                HttpMessageHandlerFactory = () => mockHttp
+            };
+
+            var fixture = RestService.For<IImplementTheInterfaceAndUseRefit>("https://httpbin.org", settings);
+
+            mockHttp.Expect(HttpMethod.Get, "https://httpbin.org/doSomething")
+                    .WithQueryString("parameter", "4")
+                    .Respond("application/json", nameof(IImplementTheInterfaceAndUseRefit.DoSomething));
+
+            await fixture.DoSomething(4);
+            mockHttp.VerifyNoOutstandingExpectation();
+
+
+
+
+            mockHttp.Expect(HttpMethod.Get, "https://httpbin.org/DoSomethingElse")
+                .Respond("application/json", nameof(IImplementTheInterfaceAndUseRefit.DoSomethingElse));
+            await fixture.DoSomethingElse();
+            mockHttp.VerifyNoOutstandingExpectation();
+
+
+            mockHttp.Expect(HttpMethod.Get, "https://httpbin.org/DoSomethingElse")
+    .Respond("application/json", nameof(IImplementTheInterfaceAndUseRefit.DoSomethingElse));
+            await ((IAmInterfaceEWithNoRefit<int>)fixture).DoSomethingElse();
+            mockHttp.VerifyNoOutstandingExpectation();
+
+
+            Assert.Throws<InvalidOperationException>(() => RestService.For<IAmInterfaceEWithNoRefit<int>>("https://httpbin.org"));
+        }
+
         [Fact]
         public async Task DictionaryDynamicQueryparametersTest()
         {
@@ -1682,7 +1851,7 @@ namespace Refit.Tests
             };
 
             mockHttp.Expect(HttpMethod.Get, "https://httpbin.org/get")
-                .Respond("application/json", "{'url': 'https://httpbin.org/get?hardcoded=true&FirstName=John&LastName=Rambo&Address_Zip=9999&Address_Street=HomeStreet 99', 'args': {'Address_Street': 'HomeStreet 99','Address_Zip': '9999','FirstName': 'John','LastName': 'Rambo','hardcoded': 'true'}}");
+                .Respond("application/json", "{\"url\": \"https://httpbin.org/get?hardcoded=true&FirstName=John&LastName=Rambo&Address_Zip=9999&Address_Street=HomeStreet 99\", \"args\": {\"Address_Street\": \"HomeStreet 99\",\"Address_Zip\": \"9999\",\"FirstName\": \"John\",\"LastName\": \"Rambo\",\"hardcoded\": \"true\"}}");
 
             var myParams = new Dictionary<string, object>
             {
@@ -1715,7 +1884,7 @@ namespace Refit.Tests
             };
 
             mockHttp.Expect(HttpMethod.Get, "https://httpbin.org/get")
-                .Respond("application/json", "{'url': 'https://httpbin.org/get?search.FirstName=John&search.LastName=Rambo&search.Addr.Zip=9999&search.Addr.Street=HomeStreet 99', 'args': {'search.Addr.Street': 'HomeStreet 99','search.Addr.Zip': '9999','search.FirstName': 'John','search.LastName': 'Rambo'}}");
+                .Respond("application/json", "{\"url\": \"https://httpbin.org/get?search.FirstName=John&search.LastName=Rambo&search.Addr.Zip=9999&search.Addr.Street=HomeStreet 99\", \"args\": {\"search.Addr.Street\": \"HomeStreet 99\",\"search.Addr.Zip\": \"9999\",\"search.FirstName\": \"John\",\"search.LastName\": \"Rambo\"}}");
 
             var myParams = new MyComplexQueryParams
             {
@@ -1900,6 +2069,9 @@ namespace Refit.Tests
             Assert.IsType<CollisionA.SomeType>(respA);
             Assert.IsType<CollisionB.SomeType>(respB);
         }
+
+
+
 
         internal static Stream GetTestFileStream(string relativeFilePath)
         {

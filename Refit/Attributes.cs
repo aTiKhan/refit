@@ -127,7 +127,7 @@ namespace Refit
         UrlEncoded,
 
         /// <summary>
-        /// Encodes everything using the ContentSerializer in RefitSettings 
+        /// Encodes everything using the ContentSerializer in RefitSettings
         /// </summary>
         Serialized
     }
@@ -184,12 +184,21 @@ namespace Refit
         public string Name { get; protected set; }
     }
 
+    /// <summary>
+    /// Allows you provide a Dictionary of headers to be added to the request.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Parameter)]
+    public class HeaderCollectionAttribute : Attribute
+    {
+
+    }
+
     [AttributeUsage(AttributeTargets.Interface | AttributeTargets.Method)]
     public class HeadersAttribute : Attribute
     {
         public HeadersAttribute(params string[] headers)
         {
-            Headers = headers ?? new string[0];
+            Headers = headers ?? Array.Empty<string>();
         }
 
         public string[] Headers { get; }
@@ -206,11 +215,36 @@ namespace Refit
         public string Header { get; }
     }
 
+    /// <summary>
+    /// Used to store the value in HttpRequestMessage.Properties for further processing in a custom DelegatingHandler.
+    /// If a string is supplied to the constructor then it will be used as the key in the HttpRequestMessage.Properties dictionary.
+    /// If no key is specified then the key will be defaulted to the name of the parameter.
+    /// </summary>
     [AttributeUsage(AttributeTargets.Parameter)]
-    public class AuthorizeAttribute : HeaderAttribute
+    public class PropertyAttribute : Attribute
+    {
+        public PropertyAttribute() { }
+
+        public PropertyAttribute(string key)
+        {
+            Key = key;
+        }
+
+        /// <summary>
+        /// Specifies the key under which to store the value on the HttpRequestMessage.Properties dictionary.
+        /// </summary>
+        public string? Key { get; }
+    }
+
+    [AttributeUsage(AttributeTargets.Parameter)]
+    public class AuthorizeAttribute : Attribute
     {
         public AuthorizeAttribute(string scheme = "Bearer")
-            : base("Authorization: " + scheme) { }
+        {
+            Scheme = scheme;
+        }
+
+        public string Scheme { get; }
     }
 
     [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Property)] // Property is to allow for form url encoded data
@@ -251,7 +285,7 @@ namespace Refit
         public string Delimiter { get; protected set; } = ".";
 
         /// <summary>
-        /// Used to customize the name of the encoded value.  
+        /// Used to customize the name of the encoded value.
         /// </summary>
         /// <remarks>
         /// Gets combined with <see cref="Delimiter"/> in the format <code>var name = $"{Prefix}{Delimiter}{originalFieldName}"</code>
@@ -267,7 +301,7 @@ namespace Refit
         /// </code>
         /// will result in the encoded form having a field named <c>dontlog-password</c>.
         /// </example>
-        public string Prefix { get; protected set; }
+        public string? Prefix { get; protected set; }
 
         /// <summary>
         /// Used to customize the formatting of the encoded value.
@@ -282,7 +316,7 @@ namespace Refit
         /// </code>
         /// Calling <c>serverApi.addExpense(5)</c> will result in a URI of <c>{baseUri}/expenses?expense=5.00</c>.
         /// </example>
-        public string Format { get; set; }
+        public string? Format { get; set; }
 
         /// <summary>
         /// Specifies how the collection should be encoded.

@@ -47,6 +47,10 @@ namespace Refit.Tests
 
         [Multipart]
         [Post("/")]
+        Task<HttpResponseMessage> UploadStringWithHeaderAndRequestProperty([Header("Authorization")] string authorization, [Property("SomeProperty")] string someProperty, [AliasAs("SomeStringAlias")]string someString);
+
+        [Multipart]
+        [Post("/")]
         Task<HttpResponseMessage> UploadFileInfo(IEnumerable<FileInfo> fileInfos, FileInfo anotherFile);
 
         [Multipart]
@@ -291,6 +295,54 @@ namespace Refit.Tests
         }
 
         [Fact]
+        public async Task MultipartUploadShouldWorkWithHeaderAndRequestProperty()
+        {
+            const string text = "This is random text";
+            const string someHeader = "someHeader";
+            const string someProperty = "someProperty";
+
+            var handler = new MockHttpMessageHandler
+            {
+                RequestAsserts = message =>
+                {
+                    Assert.Equal(someHeader, message.Headers.Authorization.ToString());
+
+#if NET5_0_OR_GREATER
+                    Assert.Equal(2, message.Options.Count());
+                    Assert.Equal(someProperty, ((IDictionary<string, object>)message.Options)["SomeProperty"]);
+#endif
+
+#pragma warning disable CS0618 // Type or member is obsolete
+                    Assert.Equal(2, message.Properties.Count);
+                    Assert.Equal(someProperty, message.Properties["SomeProperty"]);
+#pragma warning restore CS0618 // Type or member is obsolete
+                },
+                Asserts = async content =>
+                {
+                    var parts = content.ToList();
+
+                    Assert.Single(parts);
+
+                    Assert.Equal("SomeStringAlias", parts[0].Headers.ContentDisposition.Name);
+                    Assert.Null(parts[0].Headers.ContentDisposition.FileName);
+                    Assert.Equal("text/plain", parts[0].Headers.ContentType.MediaType);
+                    Assert.Equal("utf-8", parts[0].Headers.ContentType.CharSet);
+                    var str = await parts[0].ReadAsStringAsync();
+                    Assert.Equal(text, str);
+                }
+            };
+
+            var settings = new RefitSettings()
+            {
+                HttpMessageHandlerFactory = () => handler
+            };
+
+
+            var fixture = RestService.For<IRunscopeApi>(BaseAddress, settings);
+            var result = await fixture.UploadStringWithHeaderAndRequestProperty(someHeader,someProperty, text);
+        }
+
+        [Fact]
         public async Task MultipartUploadShouldWorkWithStreamPart()
         {
             var handler = new MockHttpMessageHandler
@@ -319,6 +371,37 @@ namespace Refit.Tests
             using var stream = GetTestFileStream("Test Files/Test.pdf");
             var fixture = RestService.For<IRunscopeApi>(BaseAddress, settings);
             var result = await fixture.UploadStreamPart(new StreamPart(stream, "test-streampart.pdf", "application/pdf"));
+        }
+
+        [Fact]
+        public async Task MultipartUploadShouldWorkWithStreamPartWithNamedMultipart()
+        {
+            var handler = new MockHttpMessageHandler
+            {
+                Asserts = async content =>
+                {
+                    var parts = content.ToList();
+
+                    Assert.Single(parts);
+
+                    Assert.Equal("test-stream", parts[0].Headers.ContentDisposition.Name);
+                    Assert.Equal("test-streampart.pdf", parts[0].Headers.ContentDisposition.FileName);
+                    Assert.Equal("application/pdf", parts[0].Headers.ContentType.MediaType);
+
+                    using var str = await parts[0].ReadAsStreamAsync();
+                    using var src = GetTestFileStream("Test Files/Test.pdf");
+                    Assert.True(StreamsEqual(src, str));
+                }
+            };
+
+            var settings = new RefitSettings()
+            {
+                HttpMessageHandlerFactory = () => handler
+            };
+
+            using var stream = GetTestFileStream("Test Files/Test.pdf");
+            var fixture = RestService.For<IRunscopeApi>(BaseAddress, settings);
+            var result = await fixture.UploadStreamPart(new StreamPart(stream, "test-streampart.pdf", "application/pdf", "test-stream"));
         }
 
         [Fact]
@@ -471,9 +554,9 @@ namespace Refit.Tests
         [InlineData(typeof(XmlContentSerializer), "application/xml")]
         public async Task MultipartUploadShouldWorkWithAnObject(Type contentSerializerType, string mediaType)
         {
-            if (!(Activator.CreateInstance(contentSerializerType) is IContentSerializer serializer))
+            if (Activator.CreateInstance(contentSerializerType) is not IHttpContentSerializer serializer)
             {
-                throw new ArgumentException($"{contentSerializerType.FullName} does not implement {nameof(IContentSerializer)}");
+                throw new ArgumentException($"{contentSerializerType.FullName} does not implement {nameof(IHttpContentSerializer)}");
             }
 
             var model1 = new ModelObject
@@ -493,7 +576,7 @@ namespace Refit.Tests
                     Assert.Equal("theObject", parts[0].Headers.ContentDisposition.Name);
                     Assert.Null(parts[0].Headers.ContentDisposition.FileName);
                     Assert.Equal(mediaType, parts[0].Headers.ContentType.MediaType);
-                    var result0 = await serializer.DeserializeAsync<ModelObject>(parts[0]).ConfigureAwait(false);
+                    var result0 = await serializer.FromHttpContentAsync<ModelObject>(parts[0]).ConfigureAwait(false);
                     Assert.Equal(model1.Property1, result0.Property1);
                     Assert.Equal(model1.Property2, result0.Property2);
                 }
@@ -515,9 +598,9 @@ namespace Refit.Tests
         [InlineData(typeof(XmlContentSerializer), "application/xml")]
         public async Task MultipartUploadShouldWorkWithObjects(Type contentSerializerType, string mediaType)
         {
-            if (!(Activator.CreateInstance(contentSerializerType) is IContentSerializer serializer))
+            if (Activator.CreateInstance(contentSerializerType) is not IHttpContentSerializer serializer)
             {
-                throw new ArgumentException($"{contentSerializerType.FullName} does not implement {nameof(IContentSerializer)}");
+                throw new ArgumentException($"{contentSerializerType.FullName} does not implement {nameof(IHttpContentSerializer)}");
             }
 
             var model1 = new ModelObject
@@ -542,7 +625,7 @@ namespace Refit.Tests
                     Assert.Equal("theObjects", parts[0].Headers.ContentDisposition.Name);
                     Assert.Null(parts[0].Headers.ContentDisposition.FileName);
                     Assert.Equal(mediaType, parts[0].Headers.ContentType.MediaType);
-                    var result0 = await serializer.DeserializeAsync<ModelObject>(parts[0]).ConfigureAwait(false);
+                    var result0 = await serializer.FromHttpContentAsync<ModelObject>(parts[0]).ConfigureAwait(false);
                     Assert.Equal(model1.Property1, result0.Property1);
                     Assert.Equal(model1.Property2, result0.Property2);
 
@@ -550,7 +633,7 @@ namespace Refit.Tests
                     Assert.Equal("theObjects", parts[1].Headers.ContentDisposition.Name);
                     Assert.Null(parts[1].Headers.ContentDisposition.FileName);
                     Assert.Equal(mediaType, parts[1].Headers.ContentType.MediaType);
-                    var result1 = await serializer.DeserializeAsync<ModelObject>(parts[1]).ConfigureAwait(false);
+                    var result1 = await serializer.FromHttpContentAsync<ModelObject>(parts[1]).ConfigureAwait(false);
                     Assert.Equal(model2.Property1, result1.Property1);
                     Assert.Equal(model2.Property2, result1.Property2);
                 }
@@ -712,7 +795,7 @@ namespace Refit.Tests
         {
             Assert.Throws<ArgumentNullException>(() =>
             {
-                var byteArrayPart = new ByteArrayPart(new byte[0], null, "application/pdf");
+                var byteArrayPart = new ByteArrayPart(Array.Empty<byte>(), null, "application/pdf");
             });
         }
 
@@ -756,7 +839,7 @@ namespace Refit.Tests
             return stream;
         }
 
-        bool StreamsEqual(Stream a, Stream b)
+        static bool StreamsEqual(Stream a, Stream b)
         {
             if (a == null &&
                 b == null)

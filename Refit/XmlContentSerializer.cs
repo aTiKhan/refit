@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Serialization;
@@ -10,10 +13,10 @@ using System.Xml.Serialization;
 namespace Refit
 {
 
-    public class XmlContentSerializer : IContentSerializer
+    public class XmlContentSerializer : IHttpContentSerializer
     {
         readonly XmlContentSerializerSettings settings;
-        readonly ConcurrentDictionary<Type, XmlSerializer> serializerCache = new ConcurrentDictionary<Type, XmlSerializer>();
+        readonly ConcurrentDictionary<Type, XmlSerializer> serializerCache = new();
 
         public XmlContentSerializer() : this(new XmlContentSerializerSettings())
         {
@@ -24,8 +27,10 @@ namespace Refit
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
         }
 
-        public Task<HttpContent> SerializeAsync<T>(T item)
+        public HttpContent ToHttpContent<T>(T item)
         {
+            if (item is null) throw new ArgumentNullException(nameof(item));
+
             var xmlSerializer = serializerCache.GetOrAdd(item.GetType(), t => new XmlSerializer(t, settings.XmlAttributeOverrides));
 
             using var stream = new MemoryStream();
@@ -34,16 +39,37 @@ namespace Refit
             xmlSerializer.Serialize(writer, item, settings.XmlNamespaces);
             var str = encoding.GetString(stream.ToArray());
             var content = new StringContent(str, encoding, "application/xml");
-            return Task.FromResult((HttpContent)content);
+            return content;
         }
 
-        public async Task<T> DeserializeAsync<T>(HttpContent content)
+        public async Task<T?> FromHttpContentAsync<T>(HttpContent content, CancellationToken cancellationToken = default)
         {
-            var xmlSerializer = serializerCache.GetOrAdd(typeof(T), t => new XmlSerializer(t, settings.XmlAttributeOverrides));
+            var xmlSerializer = serializerCache.GetOrAdd(typeof(T), t => new XmlSerializer(
+                t,
+                settings.XmlAttributeOverrides,
+                Array.Empty<Type>(),
+                null,
+                settings.XmlDefaultNamespace));
 
-            using var input = new StringReader(await content.ReadAsStringAsync().ConfigureAwait(false));
+
+            using var input = new StringReader(await content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+
             using var reader = XmlReader.Create(input, settings.XmlReaderWriterSettings.ReaderSettings);
-            return (T)xmlSerializer.Deserialize(reader);
+            return (T?)xmlSerializer.Deserialize(reader);
+        }
+
+        public string? GetFieldNameForProperty(PropertyInfo propertyInfo)
+        {
+            if (propertyInfo is null)
+                throw new ArgumentNullException(nameof(propertyInfo));
+
+            return propertyInfo.GetCustomAttributes<XmlElementAttribute>(true)
+                       .Select(a => a.ElementName)
+                       .FirstOrDefault()
+                  ??
+                  propertyInfo.GetCustomAttributes<XmlAttributeAttribute>(true)
+                       .Select(a => a.AttributeName)
+                       .FirstOrDefault();
         }
     }
 
@@ -64,7 +90,9 @@ namespace Refit
         {
         }
 
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
         public XmlReaderWriterSettings(XmlReaderSettings readerSettings, XmlWriterSettings writerSettings)
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
         {
             ReaderSettings = readerSettings;
             WriterSettings = writerSettings;
@@ -106,6 +134,7 @@ namespace Refit
     {
         public XmlContentSerializerSettings()
         {
+            XmlDefaultNamespace = null;
             XmlReaderWriterSettings = new XmlReaderWriterSettings();
             XmlNamespaces = new XmlSerializerNamespaces(
                 new[]
@@ -115,6 +144,8 @@ namespace Refit
 
             XmlAttributeOverrides = new XmlAttributeOverrides();
         }
+
+        public string? XmlDefaultNamespace { get; set; }
 
         public XmlReaderWriterSettings XmlReaderWriterSettings { get; set; }
 

@@ -1,49 +1,29 @@
 ﻿using System;
 using System.IO;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 
 namespace Refit
 {
-    [Obsolete("Use NewtonsoftJsonContentSerializer instead", false)]
-    public class JsonContentSerializer : IContentSerializer
+    [Obsolete("Use NewtonsoftJsonContentSerializer in the Refit.Newtonsoft.Json package instead", true)]
+    public class JsonContentSerializer : IHttpContentSerializer
     {
-        readonly Lazy<JsonSerializerSettings> jsonSerializerSettings;
-
-        public JsonContentSerializer() : this(null) { }
-
-        public JsonContentSerializer(JsonSerializerSettings jsonSerializerSettings)
+        public HttpContent ToHttpContent<T>(T item)
         {
-            this.jsonSerializerSettings = new Lazy<JsonSerializerSettings>(() =>
-            {
-                if (jsonSerializerSettings == null)
-                {
-                    if (JsonConvert.DefaultSettings == null)
-                    {
-                        return new JsonSerializerSettings();
-                    }
-                    return JsonConvert.DefaultSettings();
-                }
-                return jsonSerializerSettings;
-            });
+            throw new NotImplementedException();
         }
 
-        public Task<HttpContent> SerializeAsync<T>(T item)
+        public Task<T?> FromHttpContentAsync<T>(HttpContent content, CancellationToken cancellationToken = default)
         {
-            var content = new StringContent(JsonConvert.SerializeObject(item, jsonSerializerSettings.Value), Encoding.UTF8, "application/json");
-            return Task.FromResult((HttpContent)content);
+            throw new NotImplementedException();
         }
 
-        public async Task<T> DeserializeAsync<T>(HttpContent content)
+        public string GetFieldNameForProperty(PropertyInfo propertyInfo)
         {
-            var serializer = JsonSerializer.Create(jsonSerializerSettings.Value);
-
-            using var stream = await content.ReadAsStreamAsync().ConfigureAwait(false);
-            using var reader = new StreamReader(stream);
-            using var jsonTextReader = new JsonTextReader(reader);
-            return serializer.Deserialize<T>(jsonTextReader);
+            throw new NotImplementedException();
         }
     }
 }

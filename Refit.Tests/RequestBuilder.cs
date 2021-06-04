@@ -51,17 +51,137 @@ namespace Refit.Tests
         IObservable<string> PostSomeUrlEncodedStuff([AliasAs("id")] int anId, [Body(BodySerializationMethod.UrlEncoded)] Dictionary<string, string> theData);
 
         [Get("/foo/bar/{id}")]
-        [Headers("Api-Version: 2 ")]
+        IObservable<string> FetchSomeStuffWithAuthorizationSchemeSpecified([AliasAs("id")] int anId, [Authorize("Bearer")] string token);
+
+        [Get("/foo/bar/{id}")]
+        [Headers("Api-Version: 2", "Accept: application/json")]
         Task<string> FetchSomeStuffWithHardcodedHeaders(int id);
 
         [Get("/foo/bar/{id}")]
         Task<string> FetchSomeStuffWithDynamicHeader(int id, [Header("Authorization")] string authorization);
 
         [Get("/foo")]
-        Task<string> FetchSomeStuffWithDynamicHeaderQueryParamAndArrayQueryParam([Header("Authorization")] string authorization, int id, [Query(CollectionFormat.Multi)] string[] someArray);
+        Task<string> FetchSomeStuffWithDynamicHeaderQueryParamAndArrayQueryParam([Header("Authorization")] string authorization, int id, [Query(CollectionFormat.Multi)] string[] someArray, [Property("SomeProperty")] object someValue);
+
+        #region [HeaderCollection] interface methods
+
+        [Get("/foo/bar/{id}")]
+        [Headers("Authorization: SRSLY aHR0cDovL2kuaW1ndXIuY29tL0NGRzJaLmdpZg==", "Accept: application/json")]
+        Task<string> FetchSomeStuffWithDynamicHeaderCollection(int id, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Put("/foo/bar/{id}")]
+        Task<string> PutSomeStuffWithCustomHeaderCollection(int id, [Body] object body, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Post("/foo/bar/{id}")]
+        Task<string> PostSomeStuffWithCustomHeaderCollection(int id, [Body] object body, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Patch("/foo/bar/{id}")]
+        Task<string> PatchSomeStuffWithCustomHeaderCollection(int id, [Body] object body, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Put("/foo/bar/{id}")]
+        Task<string> PutSomeStuffWithoutBodyAndCustomHeaderCollection(int id, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Post("/foo/bar/{id}")]
+        Task<string> PostSomeStuffWithoutBodyAndCustomHeaderCollection(int id, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Patch("/foo/bar/{id}")]
+        Task<string> PatchSomeStuffWithoutBodyAndCustomHeaderCollection(int id, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Put("/foo/bar/{id}")]
+        Task<string> PutSomeStuffWithInferredBodyAndWithDynamicHeaderCollection(int id, [HeaderCollection] IDictionary<string, string> headers, object inferredBody);
+
+        [Post("/foo/bar/{id}")]
+        Task<string> PostSomeStuffWithInferredBodyAndWithDynamicHeaderCollection(int id, [HeaderCollection] IDictionary<string, string> headers, object inferredBody);
+
+        [Patch("/foo/bar/{id}")]
+        Task<string> PatchSomeStuffWithInferredBodyAndWithDynamicHeaderCollection(int id, [HeaderCollection] IDictionary<string, string> headers, object inferredBody);
+
+        [Get("/foo/bar/{id}")]
+        Task<string> FetchSomeStuffWithDynamicHeaderCollectionAndAuthorize(int id, [Authorize] string value, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Post("/foo/bar/{id}")]
+        Task<string> PostSomeStuffWithDynamicHeaderCollectionAndAuthorize(int id, [Authorize] string value, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Get("/foo/bar/{id}")]
+        Task<string> FetchSomeStuffWithDynamicHeaderCollectionAndDynamicHeader(int id, [Header("Authorization")] string value, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Post("/foo/bar/{id}")]
+        Task<string> PostSomeStuffWithDynamicHeaderCollectionAndDynamicHeader(int id, [Header("Authorization")] string value, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Get("/foo/bar/{id}")]
+        Task<string> FetchSomeStuffWithDynamicHeaderCollectionAndDynamicHeaderOrderFlipped(int id, [HeaderCollection] IDictionary<string, string> headers, [Header("Authorization")] string value);
+
+        [Get("/foo/bar/{id}")]
+        Task<string> FetchSomeStuffWithPathMemberInCustomHeaderAndDynamicHeaderCollection([Header("X-PathMember")] int id, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Post("/foo/bar/{id}")]
+        Task<string> PostSomeStuffWithPathMemberInCustomHeaderAndDynamicHeaderCollection([Header("X-PathMember")] int id, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Get("/foo/bar/{id}")]
+        Task<string> FetchSomeStuffWithHeaderCollection(int id, [HeaderCollection] IDictionary<string, string> headers, int baz);
+
+        [Post("/foo/bar/{id}")]
+        Task<string> PostSomeStuffWithHeaderCollection(int id, [HeaderCollection] IDictionary<string, string> headers, int baz);
+
+        [Get("/foo/bar")]
+        Task<string> FetchSomeStuffWithDuplicateHeaderCollection([HeaderCollection] IDictionary<string, string> headers, [HeaderCollection] IDictionary<string, string> headers2);
+
+        [Post("/foo/bar")]
+        Task<string> PostSomeStuffWithDuplicateHeaderCollection([HeaderCollection] IDictionary<string, string> headers, [HeaderCollection] IDictionary<string, string> headers2);
+
+        [Get("/foo")]
+        Task<string> FetchSomeStuffWithHeaderCollectionQueryParamAndArrayQueryParam([HeaderCollection] IDictionary<string, string> headers, int id, [Query(CollectionFormat.Multi)] string[] someArray, [Property("SomeProperty")] object someValue);
+
+        [Post("/foo")]
+        Task<string> PostSomeStuffWithHeaderCollectionQueryParamAndArrayQueryParam([HeaderCollection] IDictionary<string, string> headers, int id, [Query(CollectionFormat.Multi)] string[] someArray, [Property("SomeProperty")] object someValue);
+
+        [Get("/foo")]
+        Task<string> FetchSomeStuffWithHeaderCollectionOfUnsupportedType([HeaderCollection] string headers);
+
+        [Post("/foo")]
+        Task<string> PostSomeStuffWithHeaderCollectionOfUnsupportedType([HeaderCollection] string headers);
+
+        #endregion
+
+        #region [Property] interface methods
+
+        [Get("/foo/bar/{id}")]
+        Task<string> FetchSomeStuffWithDynamicRequestProperty(int id, [Property("SomeProperty")] object someValue);
+
+        [Post("/foo/bar/{id}")]
+        Task<string> PostSomeStuffWithDynamicRequestProperty(int id, [Body] object body, [Property("SomeProperty")] object someValue);
+
+        [Post("/foo/bar/{id}")]
+        Task<string> PostSomeStuffWithDynamicRequestProperties(int id, [Body] object body, [Property("SomeProperty")] object someValue, [Property("SomeOtherProperty")] object someOtherValue);
+
+        [Put("/foo/bar/{id}")]
+        Task<string> PutSomeStuffWithoutBodyAndWithDynamicRequestProperty(int id, [Property("SomeProperty")] object someValue);
+
+        [Post("/foo/bar/{id}")]
+        Task<string> PostSomeStuffWithoutBodyAndWithDynamicRequestProperty(int id, [Property("SomeProperty")] object someValue);
+
+        [Patch("/foo/bar/{id}")]
+        Task<string> PatchSomeStuffWithoutBodyAndWithDynamicRequestProperty(int id, [Property("SomeProperty")] object someValue);
+
+        [Put("/foo/bar/{id}")]
+        Task<string> PutSomeStuffWithInferredBodyAndWithDynamicRequestProperty(int id, [Property("SomeProperty")] object someValue, object inferredBody);
+
+        [Post("/foo/bar/{id}")]
+        Task<string> PostSomeStuffWithInferredBodyAndWithDynamicRequestProperty(int id, [Property("SomeProperty")] object someValue, object inferredBody);
+
+        [Patch("/foo/bar/{id}")]
+        Task<string> PatchSomeStuffWithInferredBodyAndWithDynamicRequestProperty(int id, [Property("SomeProperty")] object someValue, object inferredBody);
+
+        [Get("/foo/bar/{id}")]
+        Task<string> FetchSomeStuffWithDynamicRequestPropertyWithDuplicateKey(int id, [Property("SomeProperty")] object someValue1, [Property("SomeProperty")] object someValue2);
+
+        [Get("/foo/bar/{id}")]
+        Task<string> FetchSomeStuffWithDynamicRequestPropertyWithoutKey(int id, [Property] object someValue, [Property("")] object someOtherValue);
+
+        #endregion
 
         [Post("/foo/{id}")]
-        Task<bool> OhYeahValueTypes(int id, [Body] int whatever);
+        Task<bool> OhYeahValueTypes(int id, [Body(buffered: true)] int whatever);
 
         [Post("/foo/{id}")]
         Task<bool> OhYeahValueTypesUnbuffered(int id, [Body(buffered: false)] int whatever);
@@ -135,6 +255,11 @@ namespace Refit.Tests
 
         public IEnumerable<int> TestCollection { get; set; }
 
+        [AliasAs("test-dictionary-alias")]
+        public Dictionary<TestEnum, string> TestAliasedDictionary { get; set; }
+
+        public Dictionary<TestEnum, string> TestDictionary { get; set; }
+
         [AliasAs("listOfEnumMulti")]
         [Query(CollectionFormat.Multi)]
         public List<TestEnum> EnumCollectionMulti { get; set; }
@@ -149,7 +274,6 @@ namespace Refit.Tests
         [Query(CollectionFormat.Csv)]
         public List<object> ObjectCollectionCcv { get; set; }
     }
-
 
     public class RestMethodInfoTests
     {
@@ -179,24 +303,27 @@ namespace Refit.Tests
             Assert.Equal(1, fixture.BodyParameterInfo.Item3);
         }
 
-        [Fact]
-        public void DefaultBodyParameterDetectedForPost()
+        [Theory]
+        [InlineData(nameof(IRestMethodInfoTests.PutWithBodyDetected))]
+        [InlineData(nameof(IRestMethodInfoTests.PostWithBodyDetected))]
+        [InlineData(nameof(IRestMethodInfoTests.PatchWithBodyDetected))]
+        public void DefaultBodyParameterDetected(string interfaceMethodName)
         {
             var input = typeof(IRestMethodInfoTests);
-            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == nameof(IRestMethodInfoTests.PostWithBodyDetected)));
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == interfaceMethodName));
 
             Assert.Empty(fixture.QueryParameterMap);
             Assert.NotNull(fixture.BodyParameterInfo);
         }
 
         [Fact]
-        public void DefaultBodyParameterDetectedForPut()
+        public void DefaultBodyParameterNotDetectedForGet()
         {
             var input = typeof(IRestMethodInfoTests);
-            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == nameof(IRestMethodInfoTests.PutWithBodyDetected)));
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == nameof(IRestMethodInfoTests.GetWithBodyDetected)));
 
-            Assert.Empty(fixture.QueryParameterMap);
-            Assert.NotNull(fixture.BodyParameterInfo);
+            Assert.Single(fixture.QueryParameterMap);
+            Assert.Null(fixture.BodyParameterInfo);
         }
 
         [Fact]
@@ -328,26 +455,6 @@ namespace Refit.Tests
             var fixtureParams = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == nameof(IRestMethodInfoTests.MultipleQueryAttributes)));
 
             Assert.Equal(3, fixtureParams.QueryParameterMap.Count);
-        }
-
-        [Fact]
-        public void DefaultBodyParameterDetectedForPatch()
-        {
-            var input = typeof(IRestMethodInfoTests);
-            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == nameof(IRestMethodInfoTests.PatchWithBodyDetected)));
-
-            Assert.Empty(fixture.QueryParameterMap);
-            Assert.NotNull(fixture.BodyParameterInfo);
-        }
-
-        [Fact]
-        public void DefaultBodyParameterNotDetectedForGet()
-        {
-            var input = typeof(IRestMethodInfoTests);
-            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == nameof(IRestMethodInfoTests.GetWithBodyDetected)));
-
-            Assert.Single(fixture.QueryParameterMap);
-            Assert.Null(fixture.BodyParameterInfo);
         }
 
         [Fact]
@@ -483,6 +590,19 @@ namespace Refit.Tests
         }
 
         [Fact]
+        public void FindTheAuthorizeParameter()
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == nameof(IRestMethodInfoTests.FetchSomeStuffWithAuthorizationSchemeSpecified)));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+
+            Assert.NotNull(fixture.AuthorizeParameterInfo);
+            Assert.Empty(fixture.QueryParameterMap);
+            Assert.Equal(1, fixture.AuthorizeParameterInfo.Item2);
+        }
+
+        [Fact]
         public void AllowUrlEncodedContent()
         {
             var input = typeof(IRestMethodInfoTests);
@@ -509,7 +629,9 @@ namespace Refit.Tests
             Assert.Equal("2", fixture.Headers["Api-Version"]);
             Assert.True(fixture.Headers.ContainsKey("User-Agent"), "Headers include User-Agent header");
             Assert.Equal("RefitTestClient", fixture.Headers["User-Agent"]);
-            Assert.Equal(2, fixture.Headers.Count);
+            Assert.True(fixture.Headers.ContainsKey("Accept"), "Headers include Accept header");
+            Assert.Equal("application/json", fixture.Headers["Accept"]);
+            Assert.Equal(3, fixture.Headers.Count);
         }
 
         [Fact]
@@ -520,6 +642,7 @@ namespace Refit.Tests
             Assert.Equal("id", fixture.ParameterMap[0].Name);
             Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
             Assert.Empty(fixture.QueryParameterMap);
+            Assert.Empty(fixture.PropertyParameterMap);
             Assert.Null(fixture.BodyParameterInfo);
 
             Assert.Equal("Authorization", fixture.HeaderParameterMap[1]);
@@ -527,6 +650,348 @@ namespace Refit.Tests
             Assert.Equal("RefitTestClient", fixture.Headers["User-Agent"]);
             Assert.Equal(2, fixture.Headers.Count);
         }
+
+        #region [HeaderCollection] Tests
+
+        [Fact]
+        public void DynamicHeaderCollectionShouldWork()
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == nameof(IRestMethodInfoTests.FetchSomeStuffWithDynamicHeaderCollection)));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+            Assert.Empty(fixture.QueryParameterMap);
+            Assert.Empty(fixture.HeaderParameterMap);
+            Assert.Empty(fixture.PropertyParameterMap);
+            Assert.Null(fixture.BodyParameterInfo);
+
+            Assert.True(fixture.Headers.ContainsKey("Authorization"), "Headers include Authorization header");
+            Assert.Equal("SRSLY aHR0cDovL2kuaW1ndXIuY29tL0NGRzJaLmdpZg==", fixture.Headers["Authorization"]);
+            Assert.True(fixture.Headers.ContainsKey("Accept"), "Headers include Accept header");
+            Assert.Equal("application/json", fixture.Headers["Accept"]);
+            Assert.True(fixture.Headers.ContainsKey("User-Agent"), "Headers include User-Agent header");
+            Assert.Equal("RefitTestClient", fixture.Headers["User-Agent"]);
+            Assert.True(fixture.Headers.ContainsKey("Api-Version"), "Headers include Api-Version header");
+            Assert.Equal("1", fixture.Headers["Api-Version"]);
+
+            Assert.Equal(4, fixture.Headers.Count);
+            Assert.Equal(1, fixture.HeaderCollectionParameterMap.Count);
+            Assert.True(fixture.HeaderCollectionParameterMap.Contains(1));
+        }
+
+        [Theory]
+        [InlineData(nameof(IRestMethodInfoTests.PutSomeStuffWithCustomHeaderCollection))]
+        [InlineData(nameof(IRestMethodInfoTests.PostSomeStuffWithCustomHeaderCollection))]
+        [InlineData(nameof(IRestMethodInfoTests.PatchSomeStuffWithCustomHeaderCollection))]
+        public void DynamicHeaderCollectionShouldWorkWithBody(string interfaceMethodName)
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == interfaceMethodName));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+            Assert.Empty(fixture.QueryParameterMap);
+            Assert.Empty(fixture.HeaderParameterMap);
+            Assert.Empty(fixture.PropertyParameterMap);
+            Assert.NotNull(fixture.BodyParameterInfo);
+            Assert.Null(fixture.AuthorizeParameterInfo);
+
+            Assert.Equal(1, fixture.HeaderCollectionParameterMap.Count);
+            Assert.True(fixture.HeaderCollectionParameterMap.Contains(2));
+        }
+
+        [Theory]
+        [InlineData(nameof(IRestMethodInfoTests.PutSomeStuffWithoutBodyAndCustomHeaderCollection))]
+        [InlineData(nameof(IRestMethodInfoTests.PostSomeStuffWithoutBodyAndCustomHeaderCollection))]
+        [InlineData(nameof(IRestMethodInfoTests.PatchSomeStuffWithoutBodyAndCustomHeaderCollection))]
+        public void DynamicHeaderCollectionShouldWorkWithoutBody(string interfaceMethodName)
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == interfaceMethodName));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+            Assert.Empty(fixture.QueryParameterMap);
+            Assert.Empty(fixture.HeaderParameterMap);
+            Assert.Empty(fixture.PropertyParameterMap);
+            Assert.Null(fixture.BodyParameterInfo);
+            Assert.Null(fixture.AuthorizeParameterInfo);
+
+            Assert.Equal(1, fixture.HeaderCollectionParameterMap.Count);
+            Assert.True(fixture.HeaderCollectionParameterMap.Contains(1));
+        }
+
+        [Theory]
+        [InlineData(nameof(IRestMethodInfoTests.PutSomeStuffWithInferredBodyAndWithDynamicHeaderCollection))]
+        [InlineData(nameof(IRestMethodInfoTests.PostSomeStuffWithInferredBodyAndWithDynamicHeaderCollection))]
+        [InlineData(nameof(IRestMethodInfoTests.PatchSomeStuffWithInferredBodyAndWithDynamicHeaderCollection))]
+        public void DynamicHeaderCollectionShouldWorkWithInferredBody(string interfaceMethodName)
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == interfaceMethodName));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+            Assert.Empty(fixture.QueryParameterMap);
+            Assert.Empty(fixture.HeaderParameterMap);
+            Assert.Empty(fixture.PropertyParameterMap);
+            Assert.NotNull(fixture.BodyParameterInfo);
+            Assert.Null(fixture.AuthorizeParameterInfo);
+
+            Assert.Equal(1, fixture.HeaderCollectionParameterMap.Count);
+            Assert.True(fixture.HeaderCollectionParameterMap.Contains(1));
+            Assert.Equal(2, fixture.BodyParameterInfo.Item3);
+        }
+
+        [Theory]
+        [InlineData(nameof(IRestMethodInfoTests.FetchSomeStuffWithDynamicHeaderCollectionAndAuthorize))]
+        [InlineData(nameof(IRestMethodInfoTests.PostSomeStuffWithDynamicHeaderCollectionAndAuthorize))]
+        public void DynamicHeaderCollectionShouldWorkWithAuthorize(string interfaceMethodName)
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == interfaceMethodName));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+            Assert.Empty(fixture.QueryParameterMap);
+            Assert.Empty(fixture.HeaderParameterMap);
+            Assert.Empty(fixture.PropertyParameterMap);
+            Assert.Null(fixture.BodyParameterInfo);
+
+            Assert.NotNull(fixture.AuthorizeParameterInfo);
+            Assert.Equal(1, fixture.HeaderCollectionParameterMap.Count);
+            Assert.True(fixture.HeaderCollectionParameterMap.Contains(2));
+        }
+
+        [Theory]
+        [InlineData(nameof(IRestMethodInfoTests.FetchSomeStuffWithDynamicHeaderCollectionAndDynamicHeader))]
+        [InlineData(nameof(IRestMethodInfoTests.PostSomeStuffWithDynamicHeaderCollectionAndDynamicHeader))]
+        public void DynamicHeaderCollectionShouldWorkWithDynamicHeader(string interfaceMethodName)
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == interfaceMethodName));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+            Assert.Empty(fixture.QueryParameterMap);
+            Assert.Null(fixture.AuthorizeParameterInfo);
+            Assert.Empty(fixture.PropertyParameterMap);
+            Assert.Null(fixture.BodyParameterInfo);
+
+            Assert.Single(fixture.HeaderParameterMap);
+            Assert.Equal("Authorization", fixture.HeaderParameterMap[1]);
+            Assert.Equal(1, fixture.HeaderCollectionParameterMap.Count);
+            Assert.True(fixture.HeaderCollectionParameterMap.Contains(2));
+
+            input = typeof(IRestMethodInfoTests);
+            fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == nameof(IRestMethodInfoTests.FetchSomeStuffWithDynamicHeaderCollectionAndDynamicHeaderOrderFlipped)));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+            Assert.Empty(fixture.QueryParameterMap);
+            Assert.Null(fixture.AuthorizeParameterInfo);
+            Assert.Empty(fixture.PropertyParameterMap);
+            Assert.Null(fixture.BodyParameterInfo);
+
+            Assert.Single(fixture.HeaderParameterMap);
+            Assert.Equal("Authorization", fixture.HeaderParameterMap[2]);
+            Assert.Equal(1, fixture.HeaderCollectionParameterMap.Count);
+            Assert.True(fixture.HeaderCollectionParameterMap.Contains(1));
+        }
+
+        [Theory]
+        [InlineData(nameof(IRestMethodInfoTests.FetchSomeStuffWithPathMemberInCustomHeaderAndDynamicHeaderCollection))]
+        [InlineData(nameof(IRestMethodInfoTests.PostSomeStuffWithPathMemberInCustomHeaderAndDynamicHeaderCollection))]
+        public void DynamicHeaderCollectionShouldWorkWithPathMemberDynamicHeader(string interfaceMethodName)
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == interfaceMethodName));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+            Assert.Empty(fixture.QueryParameterMap);
+            Assert.Null(fixture.AuthorizeParameterInfo);
+            Assert.Empty(fixture.PropertyParameterMap);
+            Assert.Null(fixture.BodyParameterInfo);
+
+            Assert.Single(fixture.HeaderParameterMap);
+            Assert.Equal("X-PathMember", fixture.HeaderParameterMap[0]);
+            Assert.Equal(1, fixture.HeaderCollectionParameterMap.Count);
+            Assert.True(fixture.HeaderCollectionParameterMap.Contains(1));
+        }
+
+        [Theory]
+        [InlineData(nameof(IRestMethodInfoTests.FetchSomeStuffWithHeaderCollection))]
+        [InlineData(nameof(IRestMethodInfoTests.PostSomeStuffWithHeaderCollection))]
+        public void DynamicHeaderCollectionInMiddleOfParamsShouldWork(string interfaceMethodName)
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == interfaceMethodName));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+            Assert.Null(fixture.AuthorizeParameterInfo);
+            Assert.Empty(fixture.PropertyParameterMap);
+            Assert.Null(fixture.BodyParameterInfo);
+
+            Assert.Equal("baz", fixture.QueryParameterMap[2]);
+            Assert.Equal(1, fixture.HeaderCollectionParameterMap.Count);
+            Assert.True(fixture.HeaderCollectionParameterMap.Contains(1));
+        }
+
+        [Theory]
+        [InlineData(nameof(IRestMethodInfoTests.FetchSomeStuffWithDuplicateHeaderCollection))]
+        [InlineData(nameof(IRestMethodInfoTests.PostSomeStuffWithDuplicateHeaderCollection))]
+        public void DynamicHeaderCollectionShouldOnlyAllowOne(string interfaceMethodName)
+        {
+            var input = typeof(IRestMethodInfoTests);
+
+            Assert.Throws<ArgumentException>(() => new RestMethodInfo(input, input.GetMethods().First(x => x.Name == interfaceMethodName)));
+        }
+
+        [Theory]
+        [InlineData(nameof(IRestMethodInfoTests.FetchSomeStuffWithHeaderCollectionQueryParamAndArrayQueryParam))]
+        [InlineData(nameof(IRestMethodInfoTests.PostSomeStuffWithHeaderCollectionQueryParamAndArrayQueryParam))]
+        public void DynamicHeaderCollectionShouldWorkWithProperty(string interfaceMethodName)
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == interfaceMethodName));
+            Assert.Null(fixture.BodyParameterInfo);
+            Assert.Null(fixture.AuthorizeParameterInfo);
+
+            Assert.Equal(2, fixture.QueryParameterMap.Count);
+            Assert.Equal("id", fixture.QueryParameterMap[1]);
+            Assert.Equal("someArray", fixture.QueryParameterMap[2]);
+
+            Assert.Single(fixture.PropertyParameterMap);
+
+            Assert.Equal(1, fixture.HeaderCollectionParameterMap.Count);
+            Assert.True(fixture.HeaderCollectionParameterMap.Contains(0));
+        }
+
+        [Theory]
+        [InlineData(nameof(IRestMethodInfoTests.FetchSomeStuffWithHeaderCollectionOfUnsupportedType))]
+        [InlineData(nameof(IRestMethodInfoTests.PostSomeStuffWithHeaderCollectionOfUnsupportedType))]
+        public void DynamicHeaderCollectionShouldOnlyWorkWithSupportedSemantics(string interfaceMethodName)
+        {
+            var input = typeof(IRestMethodInfoTests);
+            Assert.Throws<ArgumentException>(() => new RestMethodInfo(input, input.GetMethods().First(x => x.Name == interfaceMethodName)));
+        }
+
+        #endregion
+
+        #region [Property] Tests
+
+        [Fact]
+        public void DynamicRequestPropertiesShouldWork()
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == nameof(IRestMethodInfoTests.FetchSomeStuffWithDynamicRequestProperty)));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+            Assert.Empty(fixture.QueryParameterMap);
+            Assert.Empty(fixture.HeaderParameterMap);
+            Assert.Null(fixture.BodyParameterInfo);
+
+            Assert.Equal("SomeProperty", fixture.PropertyParameterMap[1]);
+        }
+
+        [Fact]
+        public void DynamicRequestPropertyShouldWorkWithBody()
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == nameof(IRestMethodInfoTests.PostSomeStuffWithDynamicRequestProperty)));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+            Assert.Empty(fixture.QueryParameterMap);
+            Assert.Empty(fixture.HeaderParameterMap);
+            Assert.NotNull(fixture.BodyParameterInfo);
+            Assert.Null(fixture.AuthorizeParameterInfo);
+            Assert.Empty(fixture.HeaderCollectionParameterMap);
+
+            Assert.Equal("SomeProperty", fixture.PropertyParameterMap[2]);
+        }
+
+        [Fact]
+        public void DynamicRequestPropertiesShouldWorkWithBody()
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == nameof(IRestMethodInfoTests.PostSomeStuffWithDynamicRequestProperties)));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+            Assert.Empty(fixture.QueryParameterMap);
+            Assert.Empty(fixture.HeaderParameterMap);
+            Assert.NotNull(fixture.BodyParameterInfo);
+            Assert.Null(fixture.AuthorizeParameterInfo);
+            Assert.Empty(fixture.HeaderCollectionParameterMap);
+
+            Assert.Equal("SomeProperty", fixture.PropertyParameterMap[2]);
+            Assert.Equal("SomeOtherProperty", fixture.PropertyParameterMap[3]);
+        }
+
+
+        [Theory]
+        [InlineData(nameof(IRestMethodInfoTests.PutSomeStuffWithoutBodyAndWithDynamicRequestProperty))]
+        [InlineData(nameof(IRestMethodInfoTests.PostSomeStuffWithoutBodyAndWithDynamicRequestProperty))]
+        [InlineData(nameof(IRestMethodInfoTests.PatchSomeStuffWithoutBodyAndWithDynamicRequestProperty))]
+        public void DynamicRequestPropertyShouldWorkWithoutBody(string interfaceMethodName)
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == interfaceMethodName));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+            Assert.Empty(fixture.QueryParameterMap);
+            Assert.Empty(fixture.HeaderParameterMap);
+            Assert.Null(fixture.BodyParameterInfo);
+            Assert.Null(fixture.AuthorizeParameterInfo);
+            Assert.Empty(fixture.HeaderCollectionParameterMap);
+
+            Assert.Equal("SomeProperty", fixture.PropertyParameterMap[1]);
+        }
+
+        [Theory]
+        [InlineData(nameof(IRestMethodInfoTests.PutSomeStuffWithInferredBodyAndWithDynamicRequestProperty))]
+        [InlineData(nameof(IRestMethodInfoTests.PostSomeStuffWithInferredBodyAndWithDynamicRequestProperty))]
+        [InlineData(nameof(IRestMethodInfoTests.PatchSomeStuffWithInferredBodyAndWithDynamicRequestProperty))]
+        public void DynamicRequestPropertyShouldWorkWithInferredBody(string interfaceMethodName)
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == interfaceMethodName));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+            Assert.Empty(fixture.QueryParameterMap);
+            Assert.Empty(fixture.HeaderParameterMap);
+            Assert.NotNull(fixture.BodyParameterInfo);
+            Assert.Null(fixture.AuthorizeParameterInfo);
+            Assert.Empty(fixture.HeaderCollectionParameterMap);
+
+            Assert.Equal("SomeProperty", fixture.PropertyParameterMap[1]);
+            Assert.Equal(2, fixture.BodyParameterInfo.Item3);
+        }
+
+        [Fact]
+        public void DynamicRequestPropertiesWithoutKeysShouldDefaultKeyToParameterName()
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == nameof(IRestMethodInfoTests.FetchSomeStuffWithDynamicRequestPropertyWithoutKey)));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+            Assert.Empty(fixture.QueryParameterMap);
+            Assert.Empty(fixture.HeaderParameterMap);
+            Assert.Null(fixture.BodyParameterInfo);
+
+            Assert.Equal("someValue", fixture.PropertyParameterMap[1]);
+            Assert.Equal("someOtherValue", fixture.PropertyParameterMap[2]);
+        }
+
+        [Fact]
+        public void DynamicRequestPropertiesWithDuplicateKeysDontBlowUp()
+        {
+            var input = typeof(IRestMethodInfoTests);
+            var fixture = new RestMethodInfo(input, input.GetMethods().First(x => x.Name == nameof(IRestMethodInfoTests.FetchSomeStuffWithDynamicRequestPropertyWithDuplicateKey)));
+            Assert.Equal("id", fixture.ParameterMap[0].Name);
+            Assert.Equal(ParameterType.Normal, fixture.ParameterMap[0].Type);
+            Assert.Empty(fixture.QueryParameterMap);
+            Assert.Empty(fixture.HeaderParameterMap);
+            Assert.Null(fixture.BodyParameterInfo);
+
+            Assert.Equal("SomeProperty", fixture.PropertyParameterMap[1]);
+            Assert.Equal("SomeProperty", fixture.PropertyParameterMap[2]);
+        }
+
+        #endregion
 
         [Fact]
         public void ValueTypesDontBlowUpBuffered()
@@ -648,6 +1113,7 @@ namespace Refit.Tests
             Assert.Equal("GET", fixture.HttpMethod.Method);
             Assert.Equal(2, fixture.QueryParameterMap.Count);
             Assert.Single(fixture.HeaderParameterMap);
+            Assert.Single(fixture.PropertyParameterMap);
         }
     }
 
@@ -673,8 +1139,8 @@ namespace Refit.Tests
         Task<string> FetchSomethingWithMultipleParametersPerSegment(int id, int width, int height);
 
         [Get("/foo/bar/{id}")]
-        [Headers("Api-Version: 2")]
-        Task<string> FetchSomeStuffWithHardcodedHeader(int id);
+        [Headers("Api-Version: 2", "Accept: application/json")]
+        Task<string> FetchSomeStuffWithHardcodedHeaders(int id);
 
         [Get("/foo/bar/{id}")]
         [Headers("Api-Version")]
@@ -695,8 +1161,60 @@ namespace Refit.Tests
         [Get("/foo/bar/{id}")]
         Task<string> FetchSomeStuffWithCustomHeader(int id, [Header("X-Emoji")] string custom);
 
+        [Get("/foo/bar/{id}")]
+        Task<string> FetchSomeStuffWithPathMemberInCustomHeader([Header("X-PathMember")]int id, [Header("X-Emoji")] string custom);
+
         [Post("/foo/bar/{id}")]
         Task<string> PostSomeStuffWithCustomHeader(int id, [Body] object body, [Header("X-Emoji")] string emoji);
+
+        [Get("/foo/bar/{id}")]
+        [Headers("Authorization: SRSLY aHR0cDovL2kuaW1ndXIuY29tL0NGRzJaLmdpZg==", "Accept: application/json")]
+        Task<string> FetchSomeStuffWithDynamicHeaderCollection(int id, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Delete("/foo/bar/{id}")]
+        [Headers("Authorization: SRSLY aHR0cDovL2kuaW1ndXIuY29tL0NGRzJaLmdpZg==", "Accept: application/json")]
+        Task<string> DeleteSomeStuffWithDynamicHeaderCollection(int id, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Put("/foo/bar/{id}")]
+        [Headers("Authorization: SRSLY aHR0cDovL2kuaW1ndXIuY29tL0NGRzJaLmdpZg==", "Accept: application/json")]
+        Task<string> PutSomeStuffWithDynamicHeaderCollection(int id, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Post("/foo/bar/{id}")]
+        [Headers("Authorization: SRSLY aHR0cDovL2kuaW1ndXIuY29tL0NGRzJaLmdpZg==", "Accept: application/json")]
+        Task<string> PostSomeStuffWithDynamicHeaderCollection(int id, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Patch("/foo/bar/{id}")]
+        [Headers("Authorization: SRSLY aHR0cDovL2kuaW1ndXIuY29tL0NGRzJaLmdpZg==", "Accept: application/json")]
+        Task<string> PatchSomeStuffWithDynamicHeaderCollection(int id, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Get("/foo/bar/{id}")]
+        [Headers("Authorization: SRSLY aHR0cDovL2kuaW1ndXIuY29tL0NGRzJaLmdpZg==")]
+        Task<string> FetchSomeStuffWithDynamicHeaderCollectionAndDynamicHeader(int id, [Header("Authorization")] string value, [HeaderCollection] IDictionary<string, string> headers);
+
+        [Get("/foo/bar/{id}")]
+        [Headers("Authorization: SRSLY aHR0cDovL2kuaW1ndXIuY29tL0NGRzJaLmdpZg==")]
+        Task<string> FetchSomeStuffWithDynamicHeaderCollectionAndDynamicHeaderOrderFlipped(int id, [HeaderCollection] IDictionary<string, string> headers, [Header("Authorization")] string value);
+
+        [Get("/foo/bar/{id}")]
+        Task<string> FetchSomeStuffWithDynamicRequestProperty(int id, [Property("SomeProperty")] object someProperty);
+
+        [Delete("/foo/bar/{id}")]
+        Task<string> DeleteSomeStuffWithDynamicRequestProperty(int id, [Property("SomeProperty")] object someProperty);
+
+        [Put("/foo/bar/{id}")]
+        Task<string> PutSomeStuffWithDynamicRequestProperty(int id, [Property("SomeProperty")] object someProperty);
+
+        [Post("/foo/bar/{id}")]
+        Task<string> PostSomeStuffWithDynamicRequestProperty(int id, [Property("SomeProperty")] object someProperty);
+
+        [Patch("/foo/bar/{id}")]
+        Task<string> PatchSomeStuffWithDynamicRequestProperty(int id, [Property("SomeProperty")] object someProperty);
+
+        [Get("/foo/bar/{id}")]
+        Task<string> FetchSomeStuffWithDynamicRequestPropertyWithDuplicateKey(int id, [Property("SomeProperty")] object someValue1, [Property("SomeProperty")] object someValue2);
+
+        [Get("/foo/bar/{id}")]
+        Task<string> FetchSomeStuffWithDynamicRequestPropertyWithoutKey(int id, [Property] object someValue, [Property("")] object someOtherValue);
 
         [Get("/string")]
         Task<string> FetchSomeStuffWithoutFullPath();
@@ -743,6 +1261,9 @@ namespace Refit.Tests
         [Get("/query")]
         Task QueryWithArray(int[] numbers);
 
+        [Get("/query?q1={param1}&q2={param2}")]
+        Task QueryWithExplicitParameters(string param1, string param2);
+
         [Get("/query")]
         Task QueryWithArrayFormattedAsMulti([Query(CollectionFormat.Multi)]int[] numbers);
 
@@ -757,6 +1278,18 @@ namespace Refit.Tests
 
         [Get("/query")]
         Task QueryWithArrayFormattedAsPipes([Query(CollectionFormat.Pipes)]int[] numbers);
+
+        [Get("/foo")]
+        Task ComplexQueryObjectWithDictionary([Query] ComplexQueryObject query);
+
+        [Get("/foo")]
+        Task QueryWithDictionaryWithEnumKey([Query] IDictionary<TestEnum, string> query);
+
+        [Get("/foo")]
+        Task QueryWithDictionaryWithPrefix([Query(".", "dictionary")] IDictionary<TestEnum, string> query);
+
+        [Get("/foo")]
+        Task QueryWithDictionaryWithNumericKey([Query] IDictionary<int, string> query);
 
         [Get("/query")]
         Task QueryWithEnumerableFormattedAsMulti([Query(CollectionFormat.Multi)]IEnumerable<string> lines);
@@ -782,6 +1315,9 @@ namespace Refit.Tests
 
         [Get("/query")]
         Task QueryWithEnum(FooWithEnumMember foo);
+
+        [Get("/query")]
+        Task QueryWithTypeWithEnum(TypeFooWithEnumMember foo);
 
         [Get("/api/{id}")]
         Task QueryWithOptionalParameters(int id, [Query]string text = null, [Query]int? optionalId = null, [Query(CollectionFormat = CollectionFormat.Multi)]string[] filters = null);
@@ -826,6 +1362,9 @@ namespace Refit.Tests
         [Get("/query")]
         [QueryUriFormat(UriFormat.Unescaped)]
         Task UnescapedQueryParamsWithFilter(string q, string filter);
+
+        [Get("/api/foo/{id}/file_{id}?query={id}")]
+        Task SomeApiThatUsesParameterMoreThanOnceInTheUrl(string id);
     }
 
     interface ICancellableMethods
@@ -836,13 +1375,18 @@ namespace Refit.Tests
         Task<string> GetWithCancellationAndReturn(CancellationToken token = default);
     }
 
-
     public enum FooWithEnumMember
     {
         A,
 
         [EnumMember(Value = "b")]
         B
+    }
+
+    public class TypeFooWithEnumMember
+    {
+        [AliasAs("foo")]
+        public FooWithEnumMember Foo { get; set; }
     }
 
     public class SomeRequestData
@@ -878,7 +1422,7 @@ namespace Refit.Tests
             RequestMessage = request;
             if (request.Content != null)
             {
-                SendContent = await request.Content.ReadAsStringAsync().ConfigureAwait(false);
+                SendContent = await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             }
 
             CancellationToken = cancellationToken;
@@ -901,6 +1445,28 @@ namespace Refit.Tests
         {
             return constantParameterOutput;
         }
+    }
+
+    // Converts enums to ints and adds a suffix to strings to test that both dictionary keys and values are formatted.
+    public class TestEnumUrlParameterFormatter : DefaultUrlParameterFormatter
+    {
+        public override string Format(object parameterValue, ICustomAttributeProvider attributeProvider, Type type)
+        {
+            if (parameterValue is TestEnum enumValue)
+            {
+                var enumBackingValue = (int)enumValue;
+                return enumBackingValue.ToString();
+            }
+
+            if (parameterValue is string stringValue)
+            {
+                return $"{stringValue}{StringParameterSuffix}";
+            }
+
+            return base.Format(parameterValue, attributeProvider, type);
+        }
+
+        public static string StringParameterSuffix => "suffix";
     }
 
     public class TestEnumerableUrlParameterFormatter : DefaultUrlParameterFormatter
@@ -928,7 +1494,7 @@ namespace Refit.Tests
         {
             var fixture = new RequestBuilderImplementation<ICancellableMethods>();
             var factory = fixture.RunRequest("GetWithCancellation");
-            var output = factory(new object[0]);
+            var output = factory(Array.Empty<object>());
 
             var uri = new Uri(new Uri("http://api"), output.RequestMessage.RequestUri);
             Assert.Equal("/foo", uri.PathAndQuery);
@@ -1124,6 +1690,17 @@ namespace Refit.Tests
             Assert.Equal("/foo/bar/6?baz=bamf&search_for=foo", uri.PathAndQuery);
         }
 
+        [Fact]
+        public void ParameterizedValuesShouldBeInUrlMoreThanOnce()
+        {
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            var factory = fixture.BuildRequestFactoryForMethod(nameof(IDummyHttpApi.SomeApiThatUsesParameterMoreThanOnceInTheUrl));
+            var output = factory(new object[] { 6 });
+
+            var uri = new Uri(new Uri("http://api"), output.RequestUri);
+            Assert.Equal("/api/foo/6/file_6?query=6", uri.PathAndQuery);
+        }
+
         [Theory]
         [InlineData("aaa/bbb", "/foo/bar/aaa/bbb/1")]
         [InlineData("aaa/bbb/ccc", "/foo/bar/aaa/bbb/ccc/1")]
@@ -1149,6 +1726,18 @@ namespace Refit.Tests
 
             var uri = new Uri(new Uri("http://api"), output.RequestUri);
             Assert.Equal("/foo?name=", uri.PathAndQuery);
+        }
+
+        [Fact]
+        public void ParametersShouldBePutAsExplicitQueryString()
+        {
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            var factory = fixture.BuildRequestFactoryForMethod(nameof(IDummyHttpApi.QueryWithExplicitParameters));
+            var output = factory(new object[] { "value1", "value2" });
+
+            var uri = new Uri(new Uri("http://api"), output.RequestUri);
+
+            Assert.Equal("/query?q2=value2&q1=value1", uri.PathAndQuery);
         }
 
         [Fact]
@@ -1238,13 +1827,15 @@ namespace Refit.Tests
         {
             var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
 
-            var factory = fixture.BuildRequestFactoryForMethod("FetchSomeStuffWithHardcodedHeader");
+            var factory = fixture.BuildRequestFactoryForMethod(nameof(IDummyHttpApi.FetchSomeStuffWithHardcodedHeaders));
             var output = factory(new object[] { 6 });
 
             Assert.True(output.Headers.Contains("User-Agent"), "Headers include User-Agent header");
             Assert.Equal("RefitTestClient", output.Headers.UserAgent.ToString());
             Assert.True(output.Headers.Contains("Api-Version"), "Headers include Api-Version header");
             Assert.Equal("2", output.Headers.GetValues("Api-Version").Single());
+            Assert.True(output.Headers.Contains("Accept"), "Headers include Accept header");
+            Assert.Equal("application/json", output.Headers.Accept.ToString());
         }
 
         [Fact]
@@ -1345,6 +1936,17 @@ namespace Refit.Tests
         }
 
         [Fact]
+        public void PathMemberAsCustomDynamicHeaderShouldBeInHeaders()
+        {
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            var factory = fixture.BuildRequestFactoryForMethod("FetchSomeStuffWithPathMemberInCustomHeader");
+            var output = factory(new object[] { 6, ":joy_cat:" });
+
+            Assert.True(output.Headers.Contains("X-PathMember"), "Headers include X-PathMember header");
+            Assert.Equal("6", output.Headers.GetValues("X-PathMember").First());
+        }
+
+        [Fact]
         public void AddCustomHeadersToRequestHeadersOnly()
         {
             var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
@@ -1357,6 +1959,194 @@ namespace Refit.Tests
             Assert.False(output.Content.Headers.Contains("X-Emoji"), "Content headers include X-Emoji header");
         }
 
+        [Theory]
+        [InlineData(nameof(IDummyHttpApi.FetchSomeStuffWithDynamicHeaderCollection))]
+        [InlineData(nameof(IDummyHttpApi.DeleteSomeStuffWithDynamicHeaderCollection))]
+        [InlineData(nameof(IDummyHttpApi.PutSomeStuffWithDynamicHeaderCollection))]
+        [InlineData(nameof(IDummyHttpApi.PostSomeStuffWithDynamicHeaderCollection))]
+        [InlineData(nameof(IDummyHttpApi.PatchSomeStuffWithDynamicHeaderCollection))]
+        public void HeaderCollectionShouldBeInHeaders(string interfaceMethodName)
+        {
+            var headerCollection = new Dictionary<string, string>
+            {
+                {"key1", "val1"},
+                {"key2", "val2"}
+            };
+
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            var factory = fixture.BuildRequestFactoryForMethod(interfaceMethodName);
+            var output = factory(new object[] { 6, headerCollection });
+
+            Assert.True(output.Headers.Contains("User-Agent"), "Headers include User-Agent header");
+            Assert.Equal("RefitTestClient", output.Headers.GetValues("User-Agent").First());
+            Assert.True(output.Headers.Contains("Api-Version"), "Headers include Api-Version header");
+            Assert.Equal("1", output.Headers.GetValues("Api-Version").First());
+
+            Assert.True(output.Headers.Contains("Authorization"), "Headers include Authorization header");
+            Assert.Equal("SRSLY aHR0cDovL2kuaW1ndXIuY29tL0NGRzJaLmdpZg==", output.Headers.GetValues("Authorization").First());
+            Assert.True(output.Headers.Contains("Accept"), "Headers include Accept header");
+            Assert.Equal("application/json", output.Headers.GetValues("Accept").First());
+
+            Assert.True(output.Headers.Contains("key1"), "Headers include key1 header");
+            Assert.Equal("val1", output.Headers.GetValues("key1").First());
+            Assert.True(output.Headers.Contains("key2"), "Headers include key2 header");
+            Assert.Equal("val2", output.Headers.GetValues("key2").First());
+        }
+
+        [Fact]
+        public void LastWriteWinsWhenHeaderCollectionAndDynamicHeader()
+        {
+            var authHeader = "LetMeIn";
+            var headerCollection = new Dictionary<string, string>
+            {
+                {"Authorization", "OpenSesame"}
+            };
+
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            var factory = fixture.BuildRequestFactoryForMethod(nameof(IDummyHttpApi.FetchSomeStuffWithDynamicHeaderCollectionAndDynamicHeader));
+            var output = factory(new object[] { 6, authHeader, headerCollection });
+
+            Assert.True(output.Headers.Contains("Authorization"), "Headers include Authorization header");
+            Assert.Equal("OpenSesame", output.Headers.GetValues("Authorization").First());
+
+            fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            factory = fixture.BuildRequestFactoryForMethod(nameof(IDummyHttpApi.FetchSomeStuffWithDynamicHeaderCollectionAndDynamicHeaderOrderFlipped));
+            output = factory(new object[] { 6, headerCollection, authHeader });
+
+            Assert.True(output.Headers.Contains("Authorization"), "Headers include Authorization header");
+            Assert.Equal(authHeader, output.Headers.GetValues("Authorization").First());
+        }
+
+        [Theory]
+        [InlineData(nameof(IDummyHttpApi.FetchSomeStuffWithDynamicHeaderCollection))]
+        [InlineData(nameof(IDummyHttpApi.DeleteSomeStuffWithDynamicHeaderCollection))]
+        [InlineData(nameof(IDummyHttpApi.PutSomeStuffWithDynamicHeaderCollection))]
+        [InlineData(nameof(IDummyHttpApi.PostSomeStuffWithDynamicHeaderCollection))]
+        [InlineData(nameof(IDummyHttpApi.PatchSomeStuffWithDynamicHeaderCollection))]
+        public void NullHeaderCollectionDoesntBlowUp(string interfaceMethodName)
+        {
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            var factory = fixture.BuildRequestFactoryForMethod(interfaceMethodName);
+            var output = factory(new object[] { 6, null });
+
+            Assert.True(output.Headers.Contains("User-Agent"), "Headers include User-Agent header");
+            Assert.Equal("RefitTestClient", output.Headers.GetValues("User-Agent").First());
+            Assert.True(output.Headers.Contains("Api-Version"), "Headers include Api-Version header");
+            Assert.Equal("1", output.Headers.GetValues("Api-Version").First());
+
+            Assert.True(output.Headers.Contains("Authorization"), "Headers include Authorization header");
+            Assert.Equal("SRSLY aHR0cDovL2kuaW1ndXIuY29tL0NGRzJaLmdpZg==", output.Headers.GetValues("Authorization").First());
+            Assert.True(output.Headers.Contains("Accept"), "Headers include Accept header");
+            Assert.Equal("application/json", output.Headers.GetValues("Accept").First());
+        }
+
+        [Fact]
+        public void HeaderCollectionCanUnsetHeaders()
+        {
+            var headerCollection = new Dictionary<string, string>
+            {
+                {"Authorization", ""},
+                {"Api-Version", null}
+            };
+
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            var factory = fixture.BuildRequestFactoryForMethod(nameof(IDummyHttpApi.FetchSomeStuffWithDynamicHeaderCollection));
+            var output = factory(new object[] { 6, headerCollection });
+
+            Assert.True(!output.Headers.Contains("Api-Version"), "Headers does not include Api-Version header");
+
+            Assert.True(output.Headers.Contains("Authorization"), "Headers include Authorization header");
+            Assert.Equal("", output.Headers.GetValues("Authorization").First());
+        }
+
+        [Theory]
+        [InlineData(nameof(IDummyHttpApi.FetchSomeStuffWithDynamicRequestProperty))]
+        [InlineData(nameof(IDummyHttpApi.DeleteSomeStuffWithDynamicRequestProperty))]
+        [InlineData(nameof(IDummyHttpApi.PutSomeStuffWithDynamicRequestProperty))]
+        [InlineData(nameof(IDummyHttpApi.PostSomeStuffWithDynamicRequestProperty))]
+        [InlineData(nameof(IDummyHttpApi.PatchSomeStuffWithDynamicRequestProperty))]
+        public void DynamicRequestPropertiesShouldBeInProperties(string interfaceMethodName)
+        {
+            var someProperty = new object();
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            var factory = fixture.BuildRequestFactoryForMethod(interfaceMethodName);
+            var output = factory(new object[] { 6, someProperty });
+
+#if NET5_0_OR_GREATER
+            Assert.NotEmpty(output.Options);
+            Assert.Equal(someProperty, ((IDictionary<string, object>)output.Options)["SomeProperty"]);
+#endif
+
+#pragma warning disable CS0618 // Type or member is obsolete
+            Assert.NotEmpty(output.Properties);
+            Assert.Equal(someProperty, output.Properties["SomeProperty"]);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        }
+
+        [Fact]
+        public void InterfaceTypeShouldBeInProperties()
+        {
+            var someProperty = new object();
+            var fixture = new RequestBuilderImplementation<IContainAandB>();
+            var factory = fixture.BuildRequestFactoryForMethod(nameof(IContainAandB.Ping));
+            var output = factory(new object[] {  });
+
+#if NET5_0_OR_GREATER
+            Assert.NotEmpty(output.Options);
+            Assert.Equal(typeof(IContainAandB), ((IDictionary<string, object>)output.Options)[HttpRequestMessageOptions.InterfaceType]);
+#endif
+
+#pragma warning disable CS0618 // Type or member is obsolete
+            Assert.NotEmpty(output.Properties);
+            Assert.Equal(typeof(IContainAandB), output.Properties[HttpRequestMessageOptions.InterfaceType]);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        }
+
+        [Fact]
+        public void DynamicRequestPropertiesWithDefaultKeysShouldBeInProperties()
+        {
+            var someProperty = new object();
+            var someOtherProperty = new object();
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            var factory = fixture.BuildRequestFactoryForMethod(nameof(IDummyHttpApi.FetchSomeStuffWithDynamicRequestPropertyWithoutKey));
+            var output = factory(new object[] { 6, someProperty, someOtherProperty });
+
+#if NET5_0_OR_GREATER
+            Assert.NotEmpty(output.Options);
+            Assert.Equal(someProperty, ((IDictionary<string, object>)output.Options)["someValue"]);
+            Assert.Equal(someOtherProperty, ((IDictionary<string, object>)output.Options)["someOtherValue"]);
+#endif
+
+#pragma warning disable CS0618 // Type or member is obsolete
+            Assert.NotEmpty(output.Properties);
+            Assert.Equal(someProperty, output.Properties["someValue"]);
+            Assert.Equal(someOtherProperty, output.Properties["someOtherValue"]);
+#pragma warning restore CS0618 // Type or member is obsolete
+        }
+
+        [Fact]
+        public void DynamicRequestPropertiesWithDuplicateKeyShouldOverwritePreviousProperty()
+        {
+            var someProperty = new object();
+            var someOtherProperty = new object();
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            var factory = fixture.BuildRequestFactoryForMethod(nameof(IDummyHttpApi.FetchSomeStuffWithDynamicRequestPropertyWithDuplicateKey));
+            var output = factory(new object[] { 6, someProperty, someOtherProperty });
+
+
+#if NET5_0_OR_GREATER
+            Assert.Equal(2, output.Options.Count());
+            Assert.Equal(someOtherProperty, ((IDictionary<string, object>)output.Options)["SomeProperty"]);
+#endif
+
+#pragma warning disable CS0618 // Type or member is obsolete
+            Assert.Equal(2, output.Properties.Count);
+            Assert.Equal(someOtherProperty, output.Properties["SomeProperty"]);
+#pragma warning restore CS0618 // Type or member is obsolete
+        }
+
         [Fact]
         public void HttpClientShouldPrefixedAbsolutePathToTheRequestUri()
         {
@@ -1364,7 +2154,7 @@ namespace Refit.Tests
             var factory = fixture.BuildRestResultFuncForMethod("FetchSomeStuffWithoutFullPath");
             var testHttpMessageHandler = new TestHttpMessageHandler();
 
-            var task = (Task)factory(new HttpClient(testHttpMessageHandler) { BaseAddress = new Uri("http://api/foo/bar") }, new object[0]);
+            var task = (Task)factory(new HttpClient(testHttpMessageHandler) { BaseAddress = new Uri("http://api/foo/bar") }, Array.Empty<object>());
             task.Wait();
 
             Assert.Equal("http://api/foo/bar/string", testHttpMessageHandler.RequestMessage.RequestUri.ToString());
@@ -1377,7 +2167,7 @@ namespace Refit.Tests
             var factory = fixture.BuildRestResultFuncForMethod("FetchSomeStuffWithVoid");
             var testHttpMessageHandler = new TestHttpMessageHandler();
 
-            var task = (Task)factory(new HttpClient(testHttpMessageHandler) { BaseAddress = new Uri("http://api/foo/bar") }, new object[0]);
+            var task = (Task)factory(new HttpClient(testHttpMessageHandler) { BaseAddress = new Uri("http://api/foo/bar") }, Array.Empty<object>());
             task.Wait();
 
             Assert.Equal("http://api/foo/bar/void", testHttpMessageHandler.RequestMessage.RequestUri.ToString());
@@ -1654,6 +2444,20 @@ namespace Refit.Tests
         }
 
         [Theory]
+        [InlineData(FooWithEnumMember.A, "/query?foo=A")]
+        [InlineData(FooWithEnumMember.B, "/query?foo=b")]
+        public void QueryStringUsesEnumMemberAttributeInTypeWithEnum(FooWithEnumMember queryParameter, string expectedQuery)
+        {
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            var factory = fixture.BuildRequestFactoryForMethod("QueryWithTypeWithEnum");
+
+            var output = factory(new object[] { new TypeFooWithEnumMember { Foo = queryParameter } });
+
+            var uri = new Uri(new Uri("http://api"), output.RequestUri);
+            Assert.Equal(expectedQuery, uri.PathAndQuery);
+        }
+
+        [Theory]
         [InlineData("/api/123?text=title&optionalId=999&filters=A&filters=B")]
         public void TestNullableQueryStringParams(string expectedQuery)
         {
@@ -1824,6 +2628,146 @@ namespace Refit.Tests
 
             Assert.Equal(4, internalBuilder.CallCount);
         }
+
+        [Fact]
+        public void DictionaryQueryWithEnumKeyProducesCorrectQueryString()
+        {
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            var factory = fixture.BuildRequestFactoryForMethod(nameof(IDummyHttpApi.QueryWithDictionaryWithEnumKey));
+
+            var dict = new Dictionary<TestEnum, string>
+            {
+                { TestEnum.A, "value1" },
+                { TestEnum.B, "value2" },
+            };
+
+            var output = factory(new object[] { dict });
+            var uri = new Uri(new Uri("http://api"), output.RequestUri);
+
+            Assert.Equal("/foo?A=value1&B=value2", uri.PathAndQuery);
+        }
+
+        [Fact]
+        public void DictionaryQueryWithPrefix()
+        {
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            var factory = fixture.BuildRequestFactoryForMethod(nameof(IDummyHttpApi.QueryWithDictionaryWithPrefix));
+
+            var dict = new Dictionary<TestEnum, string>
+            {
+                { TestEnum.A, "value1" },
+                { TestEnum.B, "value2" },
+            };
+
+            var output = factory(new object[] { dict });
+            var uri = new Uri(new Uri("http://api"), output.RequestUri);
+
+            Assert.Equal("/foo?dictionary.A=value1&dictionary.B=value2", uri.PathAndQuery);
+        }
+
+        [Fact]
+        public void DictionaryQueryWithNumericKeyProducesCorrectQueryString()
+        {
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            var factory = fixture.BuildRequestFactoryForMethod(nameof(IDummyHttpApi.QueryWithDictionaryWithNumericKey));
+
+            var dict = new Dictionary<int, string>
+            {
+                { 1, "value1" },
+                { 2, "value2" },
+            };
+
+            var output = factory(new object[] { dict });
+            var uri = new Uri(new Uri("http://api"), output.RequestUri);
+
+            Assert.Equal("/foo?1=value1&2=value2", uri.PathAndQuery);
+        }
+
+        [Fact]
+        public void DictionaryQueryWithCustomFormatterProducesCorrectQueryString()
+        {
+            var urlParameterFormatter = new TestEnumUrlParameterFormatter();
+
+            var refitSettings = new RefitSettings { UrlParameterFormatter = urlParameterFormatter };
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>(refitSettings);
+            var factory = fixture.BuildRequestFactoryForMethod(nameof(IDummyHttpApi.QueryWithDictionaryWithEnumKey));
+
+            var dict = new Dictionary<TestEnum, string>
+            {
+                { TestEnum.A, "value1" },
+                { TestEnum.B, "value2" },
+            };
+
+            var output = factory(new object[] { dict });
+            var uri = new Uri(new Uri("http://api"), output.RequestUri);
+
+            Assert.Equal($"/foo?{(int)TestEnum.A}=value1{TestEnumUrlParameterFormatter.StringParameterSuffix}&{(int)TestEnum.B}=value2{TestEnumUrlParameterFormatter.StringParameterSuffix}", uri.PathAndQuery);
+        }
+
+        [Fact]
+        public void ComplexQueryObjectWithAliasedDictionaryProducesCorrectQueryString()
+        {
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            var factory = fixture.BuildRequestFactoryForMethod(nameof(IDummyHttpApi.ComplexQueryObjectWithDictionary));
+
+            var complexQuery = new ComplexQueryObject
+            {
+                TestAliasedDictionary = new Dictionary<TestEnum, string>
+                {
+                    { TestEnum.A, "value1" },
+                    { TestEnum.B, "value2" },
+                },
+            };
+
+            var output = factory(new object[] { complexQuery });
+            var uri = new Uri(new Uri("http://api"), output.RequestUri);
+
+            Assert.Equal("/foo?test-dictionary-alias.A=value1&test-dictionary-alias.B=value2", uri.PathAndQuery);
+        }
+
+        [Fact]
+        public void ComplexQueryObjectWithDictionaryProducesCorrectQueryString()
+        {
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>();
+            var factory = fixture.BuildRequestFactoryForMethod(nameof(IDummyHttpApi.ComplexQueryObjectWithDictionary));
+
+            var complexQuery = new ComplexQueryObject
+            {
+                TestDictionary = new Dictionary<TestEnum, string>
+                {
+                    { TestEnum.A, "value1" },
+                    { TestEnum.B, "value2" },
+                },
+            };
+
+            var output = factory(new object[] { complexQuery });
+            var uri = new Uri(new Uri("http://api"), output.RequestUri);
+
+            Assert.Equal("/foo?TestDictionary.A=value1&TestDictionary.B=value2", uri.PathAndQuery);
+        }
+
+        [Fact]
+        public void ComplexQueryObjectWithDictionaryAndCustomFormatterProducesCorrectQueryString()
+        {
+            var urlParameterFormatter = new TestEnumUrlParameterFormatter();
+            var refitSettings = new RefitSettings { UrlParameterFormatter = urlParameterFormatter };
+            var fixture = new RequestBuilderImplementation<IDummyHttpApi>(refitSettings);
+            var factory = fixture.BuildRequestFactoryForMethod(nameof(IDummyHttpApi.ComplexQueryObjectWithDictionary));
+
+            var complexQuery = new ComplexQueryObject
+            {
+                TestDictionary = new Dictionary<TestEnum, string>
+                {
+                    { TestEnum.A, "value1" },
+                    { TestEnum.B, "value2" },
+                },
+            };
+
+            var output = factory(new object[] { complexQuery });
+            var uri = new Uri(new Uri("http://api"), output.RequestUri);
+
+            Assert.Equal($"/foo?TestDictionary.{(int)TestEnum.A}=value1{TestEnumUrlParameterFormatter.StringParameterSuffix}&TestDictionary.{(int)TestEnum.B}=value2{TestEnumUrlParameterFormatter.StringParameterSuffix}", uri.PathAndQuery);
+        }
     }
 
     static class RequestBuilderTestExtensions
@@ -1855,7 +2799,15 @@ namespace Refit.Tests
             return paramList =>
             {
                 var task = (Task)factory(new HttpClient(testHttpMessageHandler) { BaseAddress = new Uri(baseAddress) }, paramList);
-                task.Wait();
+                try
+                {
+                    task.Wait();
+                }
+                catch(AggregateException e) when (e.InnerException is TaskCanceledException)
+                {
+
+                }
+
                 return testHttpMessageHandler;
             };
         }

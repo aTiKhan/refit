@@ -17,9 +17,9 @@ namespace Refit.Tests
         [InlineData(typeof(XmlContentSerializer))]
         public async Task WhenARequestRequiresABodyThenItDoesNotDeadlock(Type contentSerializerType)
         {
-            if (!(Activator.CreateInstance(contentSerializerType) is IContentSerializer serializer))
+            if (Activator.CreateInstance(contentSerializerType) is not IHttpContentSerializer serializer)
             {
-                throw new ArgumentException($"{contentSerializerType.FullName} does not implement {nameof(IContentSerializer)}");
+                throw new ArgumentException($"{contentSerializerType.FullName} does not implement {nameof(IHttpContentSerializer)}");
             }
 
             var handler = new MockPushStreamContentHttpMessageHandler
@@ -45,9 +45,9 @@ namespace Refit.Tests
         [InlineData(typeof(XmlContentSerializer))]
         public async Task WhenARequestRequiresABodyThenItIsSerialized(Type contentSerializerType)
         {
-            if (!(Activator.CreateInstance(contentSerializerType) is IContentSerializer serializer))
+            if (Activator.CreateInstance(contentSerializerType) is not IHttpContentSerializer serializer)
             {
-                throw new ArgumentException($"{contentSerializerType.FullName} does not implement {nameof(IContentSerializer)}");
+                throw new ArgumentException($"{contentSerializerType.FullName} does not implement {nameof(IHttpContentSerializer)}");
             }
 
             var model = new User
@@ -62,7 +62,7 @@ namespace Refit.Tests
                 Asserts = async content =>
                 {
                     var stringContent = new StringContent(await content.ReadAsStringAsync().ConfigureAwait(false));
-                    var user = await serializer.DeserializeAsync<User>(content).ConfigureAwait(false);
+                    var user = await serializer.FromHttpContentAsync<User>(content).ConfigureAwait(false);
                     Assert.NotSame(model, user);
                     Assert.Equal(model.Name, user.Name);
                     Assert.Equal(model.CreatedAt, user.CreatedAt);
@@ -91,12 +91,12 @@ namespace Refit.Tests
             var settings = new RefitSettings();
 
             Assert.NotNull(settings.ContentSerializer);
-            Assert.IsType<NewtonsoftJsonContentSerializer>(settings.ContentSerializer);
+            Assert.IsType<SystemTextJsonContentSerializer>(settings.ContentSerializer);
 
-            settings = new RefitSettings(new SystemTextJsonContentSerializer());
+            settings = new RefitSettings(new NewtonsoftJsonContentSerializer());
 
             Assert.NotNull(settings.ContentSerializer);
-            Assert.IsType<SystemTextJsonContentSerializer>(settings.ContentSerializer);
+            Assert.IsType<NewtonsoftJsonContentSerializer>(settings.ContentSerializer);
         }
 
         /// <summary>
@@ -136,11 +136,9 @@ namespace Refit.Tests
 
             var serializer = new SystemTextJsonContentSerializer();
 
-            var json = await serializer.SerializeAsync(model);
-
-            var stream = await json.ReadAsStreamAsync();
-
-            var result = await System.Text.Json.JsonSerializer.DeserializeAsync<TestAliasObject>(stream);
+            var json = serializer.ToHttpContent(model);
+            
+            var result = await serializer.FromHttpContentAsync<TestAliasObject>(json);
 
             Assert.NotNull(result);
             Assert.Equal(model.ShortNameForAlias, result.ShortNameForAlias);
@@ -148,7 +146,7 @@ namespace Refit.Tests
         }
 
         [Fact]
-        public async Task StreamDeserialization_UsingSystemTextJsonContentSerializer_SetsCorrectHeaders()
+        public void StreamDeserialization_UsingSystemTextJsonContentSerializer_SetsCorrectHeaders()
         {
             var model = new TestAliasObject
             {
@@ -158,10 +156,8 @@ namespace Refit.Tests
 
             var serializer = new SystemTextJsonContentSerializer();
 
-            var json = await serializer.SerializeAsync(model);
+            var json = serializer.ToHttpContent(model);
 
-            Assert.NotNull(json.Headers.ContentLength);
-            Assert.True(json.Headers.ContentLength.Value > 0);
             Assert.NotNull(json.Headers.ContentType);
             Assert.Equal("utf-8", json.Headers.ContentType.CharSet);
             Assert.Equal("application/json", json.Headers.ContentType.MediaType);

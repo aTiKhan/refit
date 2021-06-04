@@ -1,7 +1,7 @@
 trigger:
   branches:
     include:
-    - master
+    - main
     - rel/*
   paths:
     exclude:
@@ -10,7 +10,7 @@ trigger:
 pr:
   branches:
     include:
-    - master
+    - main
     - rel/*
   paths:
     exclude:
@@ -31,10 +31,11 @@ stages:
 
     steps:
     - task: UseDotNet@2
-      displayName: Use .NET Core 3.1.x SDK
+      displayName: Use .NET Core 5.x SDK
       inputs:
-        version: 3.1.x
+        version: 5.0.x
         performMultiLevelLookup: true
+        includePreviewVersions: true
 
     - task: DotNetCoreCLI@2
       inputs:
@@ -43,7 +44,7 @@ stages:
         arguments: install --tool-path . nbgv
       displayName: Install NBGV tool
 
-    - script: nbgv cloud
+    - pwsh: ./nbgv cloud
       displayName: Set Version
 
     - task: DotNetCoreCLI@2
@@ -65,7 +66,7 @@ stages:
     - task: DotNetCoreCLI@2
       inputs:
         command: pack
-        packagesToPack: Refit.HttpClientFactory/Refit.HttpClientFactory.csproj
+        packagesToPack: '**/Refit.*.csproj;!**/*.Tests.csproj'
         configuration: $(BuildConfiguration)
         packDirectory: $(Build.ArtifactStagingDirectory)\artifacts
         verbosityPack: Minimal

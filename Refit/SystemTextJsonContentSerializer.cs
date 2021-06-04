@@ -1,30 +1,44 @@
 ﻿using System;
 using System.Buffers;
 using System.Diagnostics.Contracts;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using Refit.Buffers;
 
 namespace Refit
 {
     /// <summary>
-    /// A <see langword="class"/> implementing <see cref="IContentSerializer"/> using the System.Text.Json APIs
+    /// A <see langword="class"/> implementing <see cref="IHttpContentSerializer"/> using the System.Text.Json APIs
     /// </summary>
-    public sealed class SystemTextJsonContentSerializer : IContentSerializer
+    public sealed class SystemTextJsonContentSerializer : IHttpContentSerializer
     {
         /// <summary>
         /// The JSON serialization options to use
         /// </summary>
-        private readonly JsonSerializerOptions jsonSerializerOptions;
+        readonly JsonSerializerOptions jsonSerializerOptions;
 
         /// <summary>
         /// Creates a new <see cref="SystemTextJsonContentSerializer"/> instance
         /// </summary>
-        public SystemTextJsonContentSerializer() : this(new JsonSerializerOptions()) { }
+        public SystemTextJsonContentSerializer() : this(new JsonSerializerOptions())
+        {
+
+            // Set some defaults
+            // Default to case insensitive property name matching as that's likely the behavior most users expect
+            jsonSerializerOptions.PropertyNameCaseInsensitive = true;
+            jsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+            jsonSerializerOptions.Converters.Add(new ObjectToInferredTypesConverter());
+            jsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+        }
 
         /// <summary>
         /// Creates a new <see cref="SystemTextJsonContentSerializer"/> instance with the specified parameters
@@ -36,81 +50,55 @@ namespace Refit
         }
 
         /// <inheritdoc/>
-        public Task<HttpContent> SerializeAsync<T>(T item)
+        public HttpContent ToHttpContent<T>(T item)
         {
-            using var utf8BufferWriter = new PooledBufferWriter();
+            var content = JsonContent.Create(item, options: jsonSerializerOptions);
 
-            var utf8JsonWriter = new Utf8JsonWriter(utf8BufferWriter);
-
-            JsonSerializer.Serialize(utf8JsonWriter, item, jsonSerializerOptions);
-
-            var stream = utf8BufferWriter.DetachStream();
-
-            var content = new StreamContent(stream)
-            {
-                Headers =
-                {
-                    ContentLength = stream.Length,
-                    ContentType = new MediaTypeHeaderValue("application/json") { CharSet = Encoding.UTF8.WebName }
-                }
-            };
-
-            return Task.FromResult<HttpContent>(content);
+            return content;
         }
 
         /// <inheritdoc/>
-        public async Task<T> DeserializeAsync<T>(HttpContent content)
+        public async Task<T?> FromHttpContentAsync<T>(HttpContent content, CancellationToken cancellationToken = default)
         {
-            using var stream = await content.ReadAsStreamAsync().ConfigureAwait(false);
-
-            int streamLength;
-
-            try
-            {
-                streamLength = (int)stream.Length;
-            }
-            catch (NotSupportedException)
-            {
-                /* If the stream doesn't support seeking, the Stream.Length property
-                 * cannot be used, which means we can't retrieve the size of a buffer
-                 * to rent from the pool. In this case, we just deserialize directly
-                 * from the input stream, with the Async equivalent API.
-                 * We're using a try/catch here instead of just checking Stream.CanSeek
-                 * because some streams can report that property as false even though
-                 * they actually let users access the Length property just fine. */
-                return await JsonSerializer.DeserializeAsync<T>(stream, jsonSerializerOptions).ConfigureAwait(false);
-            }
-
-            var buffer = ArrayPool<byte>.Shared.Rent(streamLength);
-
-            try
-            {
-                var utf8Length = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
-
-                return Deserialize<T>(buffer, utf8Length, jsonSerializerOptions);
-            }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(buffer);
-            }
+            var item = await content.ReadFromJsonAsync<T>(jsonSerializerOptions, cancellationToken).ConfigureAwait(false);
+            return item;
         }
 
-        /// <summary>
-        /// Deserializes an item of a specific type from a given UTF8 buffer
-        /// </summary>
-        /// <typeparam name="T">The type of item to deserialize</typeparam>
-        /// <param name="buffer">The input buffer of UTF8 bytes to read</param>
-        /// <param name="length">The length of the usable data within <paramref name="buffer"/></param>
-        /// <param name="jsonSerializerOptions">The JSON serialization settings to use</param>
-        /// <returns>A <typeparamref name="T"/> item deserialized from the UTF8 bytes within <paramref name="buffer"/></returns>
-        [Pure]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static T Deserialize<T>(byte[] buffer, int length, JsonSerializerOptions jsonSerializerOptions)
+        public string? GetFieldNameForProperty(PropertyInfo propertyInfo)
         {
-            var span = new ReadOnlySpan<byte>(buffer, 0, length);
-            var utf8JsonReader = new Utf8JsonReader(span);
+            if (propertyInfo is null)
+                throw new ArgumentNullException(nameof(propertyInfo));
 
-            return JsonSerializer.Deserialize<T>(ref utf8JsonReader, jsonSerializerOptions);
+            return propertyInfo.GetCustomAttributes<JsonPropertyNameAttribute>(true)
+                       .Select(a => a.Name)
+                       .FirstOrDefault();
         }
     }
+
+    // From https://docs.microsoft.com/en-us/dotnet/standard/serialization/system-text-json-converters-how-to?pivots=dotnet-5-0#deserialize-inferred-types-to-object-properties
+    public class ObjectToInferredTypesConverter
+       : JsonConverter<object>
+    {
+        public override object? Read(
+          ref Utf8JsonReader reader,
+          Type typeToConvert,
+          JsonSerializerOptions options) => reader.TokenType switch
+          {
+              JsonTokenType.True => true,
+              JsonTokenType.False => false,
+              JsonTokenType.Number when reader.TryGetInt64(out var l) => l,
+              JsonTokenType.Number => reader.GetDouble(),
+              JsonTokenType.String when reader.TryGetDateTime(out var datetime) => datetime,
+              JsonTokenType.String => reader.GetString(),
+              _ => JsonDocument.ParseValue(ref reader).RootElement.Clone()
+          };
+
+        public override void Write(
+            Utf8JsonWriter writer,
+            object objectToWrite,
+            JsonSerializerOptions options) =>
+            JsonSerializer.Serialize(writer, objectToWrite, objectToWrite.GetType(), options);
+    }
+
 }
+

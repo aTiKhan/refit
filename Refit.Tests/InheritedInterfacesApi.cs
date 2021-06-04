@@ -47,6 +47,29 @@ namespace Refit.Tests
         [Get("/get-requiring-using")]
         Task<ResponseModel> Get(List<Guid> guids);
     }
+
+    public interface IContainAandB : IAmInterfaceB, IAmInterfaceA
+    {
+
+    }
+
+    public interface IAmInterfaceEWithNoRefit<T>
+    {
+        public Task DoSomething(T parameter);
+
+        public Task DoSomethingElse();
+    }
+
+    public interface IImplementTheInterfaceAndUseRefit : IAmInterfaceEWithNoRefit<int>
+    {
+#pragma warning disable CS0108 // Member hides inherited member; missing new keyword
+        [Get("/doSomething")]
+        public Task DoSomething(int parameter);
+#pragma warning restore CS0108 // Member hides inherited member; missing new keyword
+
+        [Get("/DoSomethingElse")]
+        public new Task DoSomethingElse();
+    }
 }
 
 namespace Refit.Tests.SeparateNamespaceWithModel

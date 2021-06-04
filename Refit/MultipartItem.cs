@@ -7,13 +7,20 @@ namespace Refit
 {
     public abstract class MultipartItem
     {
-        public MultipartItem(string fileName, string contentType)
+        public MultipartItem(string fileName, string? contentType)
         {
-            FileName = fileName ?? throw new ArgumentNullException("fileName");
+            FileName = fileName ?? throw new ArgumentNullException(nameof(fileName));
             ContentType = contentType;
         }
 
-        public string ContentType { get; }
+        public MultipartItem(string fileName, string? contentType, string? name) : this(fileName, contentType)
+        {
+            Name = name;
+        }
+
+        public string? Name { get; }
+
+        public string? ContentType { get; }
 
         public string FileName { get; }
 
@@ -33,10 +40,10 @@ namespace Refit
 
     public class StreamPart : MultipartItem
     {
-        public StreamPart(Stream value, string fileName, string contentType = null) :
-            base(fileName, contentType)
+        public StreamPart(Stream value, string fileName, string? contentType = null, string? name = null) :
+            base(fileName, contentType, name)
         {
-            Value = value ?? throw new ArgumentNullException("value");
+            Value = value ?? throw new ArgumentNullException(nameof(value));
         }
 
         public Stream Value { get; }
@@ -49,10 +56,10 @@ namespace Refit
 
     public class ByteArrayPart : MultipartItem
     {
-        public ByteArrayPart(byte[] value, string fileName, string contentType = null) :
-            base(fileName, contentType)
+        public ByteArrayPart(byte[] value, string fileName, string? contentType = null, string? name = null) :
+            base(fileName, contentType, name)
         {
-            Value = value ?? throw new ArgumentNullException("value");
+            Value = value ?? throw new ArgumentNullException(nameof(value));
         }
 
         public byte[] Value { get; }
@@ -65,10 +72,10 @@ namespace Refit
 
     public class FileInfoPart : MultipartItem
     {
-        public FileInfoPart(FileInfo value, string fileName, string contentType = null) :
-            base(fileName, contentType)
+        public FileInfoPart(FileInfo value, string fileName, string? contentType = null, string? name = null) :
+            base(fileName, contentType, name)
         {
-            Value = value ?? throw new ArgumentNullException("value");
+            Value = value ?? throw new ArgumentNullException(nameof(value));
         }
 
         public FileInfo Value { get; }

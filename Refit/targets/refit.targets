@@ -1,14 +1,6 @@
 <Project>
 
   <PropertyGroup>
-    <IntermediateOutputPath Condition="$(IntermediateOutputPath) == '' Or $(IntermediateOutputPath) == '*Undefined*'">$(MSBuildProjectDirectory)obj\$(Configuration)\</IntermediateOutputPath>
-    <RefitTaskAssemblyFile Condition="'$(MSBuildRuntimeType)' == 'Core'">$(MSBuildThisFileDirectory)..\..\build\MSBuildCore20\InterfaceStubGenerator.BuildTasks.dll</RefitTaskAssemblyFile>
-    <RefitTaskAssemblyFile Condition="'$(MSBuildRuntimeType)' != 'Core'">$(MSBuildThisFileDirectory)..\..\build\MSBuildFull46\InterfaceStubGenerator.BuildTasks.dll</RefitTaskAssemblyFile>
-
-    <RefitMinCoreVersionRequired>2.1</RefitMinCoreVersionRequired>
-    <!-- Our default CLI version for error checking purposes -->
-    <RefitNetCoreAppVersion>$(BundledNETCoreAppTargetFrameworkVersion)</RefitNetCoreAppVersion>
-    <RefitNetCoreAppVersion Condition="'$(RefitNetCoreAppVersion)' == ''">1.0</RefitNetCoreAppVersion>
 
     <!--
     Refit internal namespace to be added to internally generated Refit code. 
@@ -16,32 +8,20 @@
     -->
     <RefitInternalNamespace Condition=" '$(RefitInternalNamespace)' == '' ">$(RootNamespace)</RefitInternalNamespace>
 
-    <RefitGeneratedFile>$(IntermediateOutputPath)\RefitStubs.g.cs</RefitGeneratedFile>
+    <_RefitMSBuildMinVersion>16.8.0</_RefitMSBuildMinVersion>
+    
   </PropertyGroup>
 
-  <UsingTask TaskName="Refit.Generator.Tasks.GenerateStubsTask" AssemblyFile="$(RefitTaskAssemblyFile)" />
-  <!--
-    BH: Checking that the project type is a csproj, otherwise don't execute
-    https://github.com/reactiveui/refit/issues/811
-  -->
-  <Target Name="GenerateRefitStubs" BeforeTargets="BeforeCompile;CoreCompile" Inputs="@(Compile)" Outputs="$(RefitGeneratedFile)" Condition="$(Language) == 'C#' and '$(RefitDisableGenerateRefitStubs)'==''">
-    <Error Condition="'$(MSBuildRuntimeType)' == 'Core' and '$(RefitMinCoreVersionRequired)' > '$(RefitNetCoreAppVersion)' "
-           Text="Refit requires at least the .NET Core SDK v2.1 to run with 'dotnet build'"
-           ContinueOnError="false"
-           />
 
-    <GenerateStubsTask SourceFiles="@(Compile)"
-                       BaseDirectory="$(MSBuildProjectDirectory)"
-                       OutputFile="$(RefitGeneratedFile)"
-                       RefitInternalNamespace="$(RefitInternalNamespace)"
-                       />
-
-    <Message Text="Processed Refit Stubs" />
-
-    <ItemGroup Condition="Exists('$(RefitGeneratedFile)')">
-      <Compile Include="$(RefitGeneratedFile)" />
-      <FileWrites Include="$(RefitGeneratedFile)" />
-    </ItemGroup>
+  <Target Name="_RefitMSBuildVersionCheck"
+          Condition=" '$([System.Version]::Parse($(_RefitMSBuildMinVersion)).CompareTo($([System.Version]::Parse($(MSBuildVersion)))))' &gt; '0' "
+     BeforeTargets="ResolveAssemblyReferences;Build;Rebuild" >
+    <Error
+        Text = "Projects using Refit cannot build using MSBuild '$(MSBuildVersion)'. MSBuild '$(_RefitMSBuildMinVersion)' or later is required." />
   </Target>
 
+  <Target Name="_RefitProjectRestoreTypeCheck" BeforeTargets="ResolveAssemblyReferences;Build;Rebuild" DependsOnTargets="_GetRestoreProjectStyle">
+    <Error Condition="'$(RestoreProjectStyle)' == 'PackagesConfig'"
+           Text="Packages.config does not support Analyzers, including Source Generators. Migrate to PackageReference: 'https://devblogs.microsoft.com/nuget/migrate-packages-config-to-package-reference/'" />
+  </Target>
 </Project>
